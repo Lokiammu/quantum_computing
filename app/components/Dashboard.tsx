@@ -5,15 +5,13 @@ import {
   AreaChart, Area, Cell
 } from 'recharts';
 import { LearningAgent, CognitiveLoadState } from '../types';
-import { CheckCircle2, Zap, Clock, Sparkles, Target, BarChart3, ListChecks, GraduationCap, Brain, RefreshCw, AlertTriangle, TrendingUp } from 'lucide-react';
-import ProjectSheet from './ProjectSheet';
-
+import { CheckCircle2, Zap, Clock, Sparkles, Target, BarChart3, GraduationCap, Brain, RefreshCw, AlertTriangle, TrendingUp } from 'lucide-react';
 interface DashboardProps {
   agents: LearningAgent[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
-  const [view, setView] = useState<'analytics' | 'quantum' | 'roadmap'>('analytics');
+  const [view, setView] = useState<'analytics' | 'quantum'>('analytics');
 
   const trendData = [
     { hour: '8am', focus: 30 },
@@ -137,17 +135,9 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
         >
           <Brain size={14}/> Quantum
         </button>
-        <button
-          onClick={() => setView('roadmap')}
-          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 ${view === 'roadmap' ? 'bg-white shadow-md text-[#0d62bb]' : 'text-white/50 hover:text-white/80'}`}
-        >
-          <ListChecks size={14}/> Sheet
-        </button>
       </div>
 
-      {view === 'roadmap' ? (
-        <ProjectSheet />
-      ) : view === 'quantum' ? (
+      {view === 'quantum' ? (
         <>
           {/* Quantum Cognitive Load Header */}
           <div className="bg-slate-900 bg-mesh p-10 md:p-14 rounded-[3rem] text-white shadow-2xl relative overflow-hidden animate-float">
@@ -396,39 +386,44 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
 
           {/* Main Analysis Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
-             <div className="figma-glass hover:-translate-y-1 transition-transform p-8 rounded-[2.5rem] space-y-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-400 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 border border-indigo-400/30">
+             <div className="figma-glass-blue hover:-translate-y-2 hover:shadow-2xl hover:shadow-indigo-500/20 transition-all duration-300 p-8 rounded-[2.5rem] space-y-4 group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-300 to-indigo-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 border border-indigo-200/50 group-hover:scale-110 transition-transform duration-300">
                    <Target size={28} />
                 </div>
-                <div>
-                   <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Nodes Covered</h4>
-                   <p className="text-3xl font-black mt-2 text-white">{totalLessonsAll} <span className="text-lg text-white/50">/ {totalSubtopics}</span></p>
+                <div className="relative z-10">
+                   <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-100/70">Nodes Covered</h4>
+                   <p className="text-4xl font-black mt-2 text-white italic drop-shadow-sm">{totalLessonsAll} <span className="text-lg text-indigo-200/50">/ {totalSubtopics}</span></p>
                 </div>
-                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                   <div className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-full" style={{ width: `${coveragePercent}%` }}></div>
+                <div className="w-full bg-black/20 h-2 rounded-full overflow-hidden border border-white/10 mt-4">
+                   <div className="bg-gradient-to-r from-indigo-300 to-indigo-500 h-full relative" style={{ width: `${coveragePercent}%` }}>
+                      <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                   </div>
                 </div>
              </div>
 
-             <div className="figma-glass hover:-translate-y-1 transition-transform p-8 rounded-[2.5rem] space-y-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 border border-emerald-400/30">
+             <div className="figma-glass hover:-translate-y-2 hover:shadow-2xl hover:shadow-emerald-500/20 transition-all duration-300 p-8 rounded-[2.5rem] space-y-4 group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <div className="w-14 h-14 bg-gradient-to-br from-emerald-300 to-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/30 border border-emerald-200/50 group-hover:scale-110 transition-transform duration-300">
                    <CheckCircle2 size={28} />
                 </div>
-                <div>
+                <div className="relative z-10">
                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Understanding</h4>
-                   <p className="text-3xl font-black mt-2 text-white">{averageUnderstanding}%</p>
+                   <p className="text-4xl font-black mt-2 text-white italic drop-shadow-sm">{averageUnderstanding}%</p>
                 </div>
-                <p className="text-[10px] font-bold text-white/50">Based on mastery nodes</p>
+                <p className="text-[10px] font-bold text-white/50 relative z-10 mt-4">Based on mastery nodes</p>
              </div>
 
-             <div className="figma-glass hover:-translate-y-1 transition-transform p-8 rounded-[2.5rem] space-y-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30 border border-amber-400/30">
+             <div className="figma-glass hover:-translate-y-2 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 p-8 rounded-[2.5rem] space-y-4 group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <div className="w-14 h-14 bg-gradient-to-br from-amber-300 to-amber-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30 border border-amber-200/50 group-hover:scale-110 transition-transform duration-300">
                    <Clock size={28} />
                 </div>
-                <div>
+                <div className="relative z-10">
                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Pacing</h4>
-                   <p className="text-3xl font-black mt-2 text-white">{timeEfficiency}%</p>
+                   <p className="text-4xl font-black mt-2 text-white italic drop-shadow-sm">{timeEfficiency}%</p>
                 </div>
-                <p className="text-[10px] font-bold text-white/50">Actual vs targeted velocity</p>
+                <p className="text-[10px] font-bold text-white/50 relative z-10 mt-4">Actual vs targeted velocity</p>
              </div>
 
              <div className="bg-gradient-to-br from-[#0d62bb]/50 to-indigo-900/50 p-8 rounded-[2.5rem] text-white shadow-xl shadow-black/10 space-y-4 hover:-translate-y-1 transition-transform border border-white/20 backdrop-blur-md">

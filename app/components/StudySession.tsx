@@ -487,21 +487,22 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-24 border-r flex flex-col items-center py-10 gap-8 bg-slate-50 shrink-0 overflow-y-auto no-scrollbar relative z-10">
+        <aside className="w-28 border-r border-slate-100 flex flex-col items-center py-10 gap-8 bg-slate-50/50 backdrop-blur-md shrink-0 overflow-y-auto no-scrollbar relative z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
            {[
              { id: 'video', label: 'Watch', icon: <Youtube size={22}/> },
              { id: 'notes', label: 'Read', icon: <BookOpen size={22}/> },
              { id: 'materials', label: 'Library', icon: <LibraryBig size={22}/> },
-             { id: 'practice', label: 'Lab', icon: <PenTool size={22}/> },
-             { id: 'flashcards', label: 'Cards', icon: <ClipboardCheck size={22}/> },
              { id: 'quiz', label: 'Quiz', icon: <CheckCircle2 size={22}/> },
              { id: 'chat', label: 'Tutor', icon: <GraduationCap size={22}/> }
            ].map(t => (
-             <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`flex flex-col items-center gap-2 group transition-all ${activeTab === t.id ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
-               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${activeTab === t.id ? 'bg-indigo-600 text-white shadow-xl rotate-2' : 'bg-white border shadow-sm group-hover:border-indigo-200'}`}>
+             <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`flex flex-col items-center gap-3 group transition-all w-full px-2 ${activeTab === t.id ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+               <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center transition-all duration-500 relative ${activeTab === t.id ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/30 rotate-3 scale-110' : 'bg-white border border-slate-200 shadow-sm group-hover:border-indigo-300 group-hover:shadow-md'}`}>
+                 {activeTab === t.id && (
+                    <div className="absolute inset-0 bg-white/20 rounded-[1.2rem] animate-pulse pointer-events-none" />
+                 )}
                  {t.icon}
                </div>
-               <span className="text-[9px] font-black uppercase tracking-widest scale-90 transition-transform">{t.label}</span>
+               <span className={`text-[9px] font-black uppercase tracking-widest transition-transform ${activeTab === t.id ? 'scale-100' : 'scale-90 opacity-70'}`}>{t.label}</span>
              </button>
            ))}
         </aside>
@@ -509,26 +510,33 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
         <main
           ref={(el) => { mainScrollRef.current = el; }}
           onScroll={handleMainScroll}
-          className="flex-1 overflow-y-auto p-12 bg-white relative custom-scrollbar"
+          className="flex-1 overflow-y-auto p-8 md:p-12 bg-white relative custom-scrollbar scroll-smooth"
         >
+          {/* Subtle animated background gradients for the main area */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 via-white to-indigo-50/20 -z-10 pointer-events-none" />
+          
           {activeTab === 'video' && (
-            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-500">
-               <div className="flex justify-between items-end border-b pb-8">
+            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700 relative">
+               <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 blur-[120px] rounded-full -z-10 pointer-events-none animate-float" />
+               
+               <div className="flex justify-between items-end border-b border-slate-100 pb-8 relative z-10">
                   <div>
-                    <h3 className="text-4xl font-black italic tracking-tighter">Visual Hub</h3>
-                    <p className="text-slate-500 font-medium mt-1">Video deep-dives for {subtopic.title}.</p>
+                    <h3 className="text-5xl font-black italic tracking-tighter drop-shadow-sm">Visual Hub</h3>
+                    <p className="text-slate-500 font-medium mt-2 text-lg">Curated video intelligence for <span className="text-indigo-600 font-bold">{subtopic.title}</span>.</p>
                   </div>
                </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 relative z-10">
                   {bundle?.videos.map((v, i) => (
-                    <div key={i} className="group bg-slate-50 p-8 rounded-[3rem] border-2 border-slate-100 hover:border-indigo-400 transition-all shadow-sm">
-                      <div className="aspect-video bg-slate-900 rounded-[2rem] overflow-hidden mb-8 relative border-4 border-white shadow-xl">
-                        <iframe className="w-full h-full" src={getEmbedUrl(v.url)} title={v.title} frameBorder="0" allowFullScreen></iframe>
+                    <div key={i} className="group bg-white/80 backdrop-blur-xl p-8 rounded-[3rem] border border-slate-200 hover:border-indigo-400/50 transition-all duration-500 shadow-lg hover:shadow-2xl hover:shadow-indigo-500/10 flex flex-col">
+                      <div className="aspect-video bg-slate-900 rounded-[2.5rem] overflow-hidden mb-8 relative border-4 border-slate-50 shadow-inner group-hover:border-indigo-50 transform transition-all duration-500">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
+                        <iframe className="w-full h-full relative z-0" src={getEmbedUrl(v.url)} title={v.title} frameBorder="0" allowFullScreen></iframe>
                       </div>
-                      <h4 className="font-black text-xl mb-3 leading-tight">{v.title}</h4>
-                      <p className="text-xs text-slate-500 mb-8 leading-relaxed line-clamp-2">{v.description}</p>
-                      <a onClick={() => handleVideoSourceClick(i)} href={v.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 w-full py-4 bg-indigo-600 text-white rounded-2xl justify-center text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg group">
-                        Source Stream <ExternalLink size={16} className="group-hover:translate-x-1 transition-transform"/>
+                      <h4 className="font-black text-2xl mb-4 leading-tight group-hover:text-indigo-600 transition-colors duration-300">{v.title}</h4>
+                      <p className="text-sm text-slate-500 mb-8 leading-relaxed line-clamp-3 flex-1">{v.description}</p>
+                      <a onClick={() => handleVideoSourceClick(i)} href={v.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 w-full py-5 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-2xl justify-center text-[11px] font-black uppercase tracking-widest hover:from-indigo-600 hover:to-violet-600 transition-all shadow-xl hover:shadow-indigo-500/30 group/btn overflow-hidden relative">
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300" />
+                        <span className="relative z-10 flex items-center gap-3">Source Stream <ExternalLink size={16} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform"/></span>
                       </a>
                     </div>
                   ))}
@@ -537,51 +545,89 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
           )}
 
           {activeTab === 'notes' && (
-            <div className="max-w-3xl mx-auto academic-content pb-24 animate-in fade-in duration-500">
-              <h2 className="text-5xl font-black mb-10 tracking-tighter leading-tight">Mastery Notes</h2>
-              <div className="bg-slate-50 p-12 rounded-[3.5rem] border border-slate-100 shadow-inner leading-relaxed" dangerouslySetInnerHTML={{ __html: bundle?.notes.replace(/\n/g, '<br/>') || '' }} />
+            <div className="max-w-4xl mx-auto academic-content pb-24 animate-in fade-in slide-in-from-bottom-8 duration-700 relative">
+              <div className="absolute -top-20 left-10 w-64 h-64 bg-fuchsia-500/5 blur-[100px] rounded-full -z-10 pointer-events-none" />
+              <h2 className="text-6xl font-black mb-12 tracking-tighter leading-tight drop-shadow-sm">Mastery Notes</h2>
+              <div className="figma-glass-blue !bg-white/60 p-12 md:p-16 rounded-[4rem] text-slate-800 shadow-2xl relative overflow-hidden group">
+                 <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-white/20 pointer-events-none" />
+                 <div className="relative z-10 leading-relaxed text-lg prose prose-lg max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-indigo-600 hover:prose-a:text-indigo-500 prose-img:rounded-3xl prose-img:shadow-xl" dangerouslySetInnerHTML={{ __html: (() => {
+                   const raw = bundle?.notes || '';
+                   // If already contains HTML tags, use as-is with styling
+                   if (/<[a-z][\s\S]*>/i.test(raw)) {
+                     return raw
+                       .replace(/<h1/g, '<h1 class="text-3xl font-black text-indigo-900 mt-10 mb-5"')
+                       .replace(/<h2/g, '<h2 class="text-2xl font-black text-indigo-800 mt-10 mb-4 border-b border-indigo-100 pb-2"')
+                       .replace(/<h3/g, '<h3 class="text-xl font-black text-indigo-700 mt-8 mb-3"')
+                       .replace(/<strong/g, '<strong class="font-black text-slate-900"')
+                       .replace(/<li/g, '<li class="ml-6 mb-2 text-slate-700"')
+                       .replace(/<p(?!\s*class)/g, '<p class="mb-4 text-slate-700 leading-relaxed"');
+                   }
+                   // Markdown to HTML conversion
+                   return raw
+                     .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black text-indigo-700 mt-8 mb-3">$1</h3>')
+                     .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black text-indigo-800 mt-10 mb-4 border-b border-indigo-100 pb-2">$1</h2>')
+                     .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black text-indigo-900 mt-10 mb-5">$1</h1>')
+                     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-black text-slate-900">$1</strong>')
+                     .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                     .replace(/`([^`]+)`/g, '<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[0.9em] font-mono">$1</code>')
+                     .replace(/^[-•] (.+)$/gm, '<li class="ml-6 mb-2 list-disc text-slate-700">$1</li>')
+                     .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-2 list-decimal text-slate-700"><span class="font-black text-indigo-600 mr-1">$1.</span> $2</li>')
+                     .replace(/(<li[^>]*>.*<\/li>\n?)+/g, (m) => `<ul class="my-4 space-y-1">${m}</ul>`)
+                     .replace(/\n{2,}/g, '</p><p class="mb-4 text-slate-700 leading-relaxed">')
+                     .replace(/\n/g, '<br/>')
+                     .replace(/^/, '<p class="mb-4 text-slate-700 leading-relaxed">')
+                     .replace(/$/, '</p>');
+                 })() }} />
+              </div>
             </div>
           )}
 
           {activeTab === 'materials' && (
-            <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-500">
-              <div className="border-b pb-8 flex justify-between items-end">
+            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700 relative">
+              <div className="absolute top-20 right-20 w-80 h-80 bg-emerald-500/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
+              
+              <div className="border-b border-slate-100 pb-8 flex justify-between items-end relative z-10">
                 <div>
-                  <h3 className="text-4xl font-black italic tracking-tighter">Reference Library</h3>
-                  <p className="text-slate-500 font-medium mt-1">Topic-specific textbooks and readable PDF guides.</p>
+                  <h3 className="text-5xl font-black italic tracking-tighter drop-shadow-sm">Reference Library</h3>
+                  <p className="text-slate-500 font-medium mt-2 text-lg">Curated textbooks and academic PDF guides.</p>
                 </div>
-                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><LibraryBig size={28} /></div>
+                <div className="p-4 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-3xl text-indigo-600 shadow-sm border border-indigo-100/50 transform rotate-3"><LibraryBig size={32} /></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
                 {bundle?.materials && bundle.materials.length > 0 ? (
                   bundle.materials.map((m, i) => (
-                    <div key={i} className="p-10 bg-slate-50 border-2 border-slate-100 rounded-[3.5rem] hover:border-indigo-500 transition-all group flex flex-col shadow-sm">
-                      <div className="w-16 h-16 rounded-3xl bg-white border border-slate-100 flex items-center justify-center text-indigo-600 mb-8 shadow-sm group-hover:shadow-md transition-all">
-                        {m.type === 'pdf' ? <FileSearch size={28}/> : m.type === 'textbook' ? <BookOpen size={28}/> : <FileText size={28}/>}
+                    <div key={i} className="p-10 bg-white/80 backdrop-blur-xl border border-slate-200 rounded-[3.5rem] hover:border-indigo-400/60 transition-all duration-500 group flex flex-col shadow-lg hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-2xl rounded-full -m-10 group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+                      
+                      <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 flex items-center justify-center text-indigo-600 mb-8 shadow-md group-hover:shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 relative z-10">
+                        {m.type === 'pdf' ? <FileSearch size={32}/> : m.type === 'textbook' ? <BookOpen size={32}/> : <FileText size={32}/>}
                       </div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-[10px] font-black uppercase bg-indigo-600 text-white px-3 py-1 rounded-full">{m.type}</span>
-                        <Sparkles size={14} className="text-amber-500" />
+                      <div className="flex items-center gap-3 mb-5 relative z-10">
+                        <span className="text-[10px] font-black uppercase bg-indigo-600 text-white px-4 py-1.5 rounded-full shadow-sm">{m.type}</span>
+                        <div className="flex items-center justify-center w-6 h-6 bg-amber-50 rounded-full border border-amber-100">
+                           <Sparkles size={12} className="text-amber-500" />
+                        </div>
                       </div>
-                      <h4 className="text-2xl font-black mb-3 leading-tight text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2">{m.title}</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed mb-10 flex-1 line-clamp-3">{m.description}</p>
-                      <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 w-full py-4 bg-white border-2 border-slate-100 rounded-2xl justify-center text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-                        Open Textbook <ExternalLink size={14}/>
+                      <h4 className="text-2xl font-black mb-4 leading-tight text-slate-900 group-hover:text-indigo-600 transition-colors duration-300 line-clamp-2 relative z-10">{m.title}</h4>
+                      <p className="text-sm text-slate-500 leading-relaxed mb-10 flex-1 line-clamp-3 relative z-10">{m.description}</p>
+                      <a href={m.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 w-full py-5 bg-slate-50 border border-slate-200 rounded-2xl justify-center text-[11px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:border-indigo-600 hover:text-white transition-all duration-300 shadow-sm hover:shadow-xl relative z-10 group/btn overflow-hidden">
+                        <span className="relative z-10 flex items-center gap-2">Open Textbook <ExternalLink size={16} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform"/></span>
                       </a>
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-3 py-24 flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3.5rem] text-slate-400">
-                    <FileSearch size={48} className="mb-4 animate-pulse opacity-20" />
-                    <p className="font-bold">Locating high-relevance textbooks and PDF resources...</p>
+                  <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm border-2 border-dashed border-slate-200 rounded-[4rem] text-slate-400">
+                    <FileSearch size={64} className="mb-6 animate-pulse opacity-30 text-indigo-300" />
+                    <p className="text-lg font-bold text-slate-500">Locating high-relevance textbooks and PDF resources...</p>
                   </div>
                 )}
               </div>
-              <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] flex items-center gap-6">
-                <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shrink-0"><Book size={24}/></div>
-                <div>
-                   <p className="text-sm font-black text-indigo-900">Digital Library Active</p>
-                   <p className="text-xs font-bold text-indigo-700/70">These resources are curated from open-source educational repositories (OER) specifically for {subtopic.title}.</p>
+              <div className="p-10 bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100/50 rounded-[3rem] flex items-center gap-8 shadow-inner relative overflow-hidden group">
+                <div className="absolute inset-0 bg-white/40 group-hover:bg-white/20 transition-colors duration-500 pointer-events-none" />
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-[2rem] flex items-center justify-center shrink-0 shadow-lg relative z-10"><Book size={28}/></div>
+                <div className="relative z-10">
+                   <p className="text-xl font-black text-indigo-950 mb-1">Digital Library Active</p>
+                   <p className="text-sm font-bold text-indigo-800/70 leading-relaxed max-w-3xl">These resources are curated from open-source educational repositories (OER) specifically cross-referenced for <span className="text-indigo-600">"{subtopic.title}"</span>.</p>
                 </div>
               </div>
             </div>
@@ -787,8 +833,24 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                         <p className="text-2xl font-black mb-12 tracking-tight leading-tight">{activeQuizSet[currentQuizIndex]?.question}</p>
                         <div className="space-y-4">
                            {activeQuizSet[currentQuizIndex]?.options.map((o, idx) => (
-                             <button key={idx} onClick={() => !showAnswer && setSelectedQuizOption(o)} className={`w-full text-left p-6 rounded-3xl border-2 font-bold text-lg transition-all ${selectedQuizOption === o ? 'border-indigo-600 bg-indigo-50 shadow-inner' : 'border-slate-100 hover:bg-slate-50'}`}>
-                               {o}
+                             <button 
+                               key={idx} 
+                               onClick={() => !showAnswer && setSelectedQuizOption(o)} 
+                               className={`w-full text-left p-6 md:p-8 rounded-[2rem] border-2 font-bold text-lg transition-all duration-300 relative overflow-hidden group ${
+                                 selectedQuizOption === o 
+                                   ? 'border-indigo-500 bg-indigo-50/80 shadow-[0_8px_30px_rgb(99,102,241,0.15)] text-indigo-900' 
+                                   : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 hover:shadow-md'
+                               }`}
+                             >
+                               {selectedQuizOption === o && (
+                                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none" />
+                               )}
+                               <span className="relative z-10 flex items-start gap-4">
+                                 <span className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-full text-sm mt-0.5 font-bold transition-colors ${
+                                   selectedQuizOption === o ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 group-hover:bg-slate-300 group-hover:text-slate-900'
+                                 }`}>{String.fromCharCode(65 + idx)}</span>
+                                 <span className="leading-relaxed">{o}</span>
+                               </span>
                              </button>
                          ))}
                         </div>

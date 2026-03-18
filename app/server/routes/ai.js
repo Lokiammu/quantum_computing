@@ -5,7 +5,7 @@ import fs from "fs/promises";
 import {
   callOpenRouter, stripJson, clipText, parseYouTubeSearchQuery,
   youtubeSearch, youtubeVideoDetails, fetchTranscriptText,
-  extractSubConcepts, rankYouTubeCandidates, youtubeApiKey
+  extractSubConcepts, rankYouTubeCandidates, getYoutubeApiKey
 } from "../utils/ai.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -115,7 +115,7 @@ router.post("/api/ai/roadmap", async (req, res) => {
   } catch (err) { return res.status(500).json({ error: err?.message || "Failed" }); }
 });
 
-// ── Generate full content bundle ──────────────────────────────────────────────
+// ── Generate full content bundle (split into parallel smaller LLM calls) ─────
 router.post("/api/ai/content", async (req, res) => {
   try {
     const subject = String(req.body?.subject || "").trim();
@@ -127,47 +127,98 @@ router.post("/api/ai/content", async (req, res) => {
     if (!subtopicTitle) return res.status(400).json({ error: "Missing subtopicTitle" });
 
     const existing = findStoredVideos({ userId, subject, topic: subtopicTitle, version });
-    const adapt = cognitiveLoad === "HIGH_LOAD" ? "DETECTED: HIGH COGNITIVE LOAD. Use simple analogies. Break content into small steps."
-      : cognitiveLoad === "LOW_LOAD" ? "DETECTED: LOW COGNITIVE LOAD. Increase technical depth." : "";
+    const adapt = cognitiveLoad === "HIGH_LOAD" ? "Simplify. Use analogies. Break into small steps."
+      : cognitiveLoad === "LOW_LOAD" ? "Increase technical depth." : "";
+    const sys = { role: "system", content: "You generate strictly valid JSON and nothing else." };
+    const llmOpts = { response_format: "json_object", num_predict: 2500, timeout: 90000 };
 
-    const prompt = `Generate a comprehensive academic learning bundle for: "${subtopicTitle}" in "${subject}".\n\n${adapt}\n\nReturn ONLY valid JSON with keys: notes (string 700+ words), videos (3 items), materials (3 items), solved_examples (3), practice_questions (5), quiz (10 MCQs), flashcards (10).\n- videos: {"title","url","description"} using https://www.youtube.com/results?search_query=...\n- materials: {"title","url","type","description"} using https://scholar.google.com/scholar?q=...\n- solved_examples: {"problem","solution","steps"}\n- practice_questions: {"question","answer"}\n- quiz: {"question","options","answer","explanation"}\n- flashcards: {"front","back"}`;
+    // Assemble the bundle from sequential smaller LLM calls (Ollama processes one at a time)
+    const bundle = { notes: "", videos: [], materials: [], solved_examples: [], practice_questions: [], quiz: [], flashcards: [] };
 
-    const content = await callOpenRouter(
-      [{ role: "system", content: "You generate strictly valid JSON and nothing else." }, { role: "user", content: prompt }],
-      { response_format: "json_object", max_tokens: 8192 }
-    );
-    const parsed = stripJson(content);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return res.status(500).json({ error: "Bundle response was not a JSON object" });
-
-    if (existing?.videos?.length) { parsed.videos = existing.videos; return res.json({ ok: true, bundle: parsed, citations: [] }); }
-
-    try {
-      if (youtubeApiKey && Array.isArray(parsed?.videos) && parsed.videos.length) {
-        const seedQueries = parsed.videos.map(v => parseYouTubeSearchQuery(v?.url)).filter(Boolean);
-        const candidates = [];
-        for (const q of seedQueries.slice(0, 3)) candidates.push(...(await youtubeSearch(q, 6)));
-        const uniq = new Map();
-        for (const c of candidates) { const id = String(c?.videoId || "").trim(); if (id && !uniq.has(id)) uniq.set(id, c); }
-        const uniqList = Array.from(uniq.values());
-        const detailsMap = await youtubeVideoDetails(uniqList.map(c => c.videoId));
-        const enriched = uniqList.map(c => ({ ...c, durationSeconds: detailsMap.get(c.videoId)?.durationSeconds ?? null }));
-        const topicText = `${subject}: ${subtopicTitle}`;
-        const concepts = await extractSubConcepts(subject, subtopicTitle);
-        const prelimRanked = await rankYouTubeCandidates(topicText, enriched, { concepts });
-        const transcriptTargets = prelimRanked.slice(0, Math.min(8, prelimRanked.length));
-        const transcriptById = new Map();
-        for (const v of transcriptTargets) { const id = String(v?.videoId || "").trim(); if (id) transcriptById.set(id, await fetchTranscriptText(id)); }
-        const enrichedWithTranscripts = enriched.map(v => ({ ...v, transcriptText: transcriptById.get(String(v?.videoId || "").trim()) || "" }));
-        const ranked = await rankYouTubeCandidates(topicText, enrichedWithTranscripts, { concepts });
-        const top = ranked.slice(0, 3);
-        if (top.length) {
-          parsed.videos = top.map(v => ({ title: v.title, url: `https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`, description: v.transcriptText ? clipText(v.transcriptText, 500) : v.description }));
-          await upsertStoredVideos({ userId, subject, topic: subtopicTitle, version, videos: parsed.videos });
-        }
+    // Helper: call LLM and parse, return null on failure
+    async function genPart(label, userPrompt) {
+      const t = Date.now();
+      process.stdout.write(`\x1b[34m  [content] generating ${label}...\x1b[0m\n`);
+      try {
+        const raw = await callOpenRouter([sys, { role: "user", content: userPrompt }], llmOpts);
+        const parsed = stripJson(raw);
+        process.stdout.write(`\x1b[32m  [content] ${label} ✓ (${Date.now() - t}ms)\x1b[0m\n`);
+        return parsed;
+      } catch (e) {
+        process.stderr.write(`\x1b[31m  [content] ${label} ✗ (${Date.now() - t}ms): ${e?.message}\x1b[0m\n`);
+        return null;
       }
-    } catch (e) { process.stderr.write(`YouTube ranking failed: ${e?.message || e}\n`); }
+    }
 
-    return res.json({ ok: true, bundle: parsed, citations: [] });
+    // 1. Notes
+    const notesData = await genPart("notes",
+      `Write detailed study notes for "${subtopicTitle}" in "${subject}". ${adapt}\nIMPORTANT: Use MARKDOWN formatting only (NOT HTML). Use ## for headings, **bold** for key terms, - for bullet points, numbered lists with 1. 2. etc.\nReturn JSON: {"notes": "<400+ words of markdown-formatted study notes>"}`);
+    if (notesData?.notes) bundle.notes = notesData.notes;
+
+    // 2. Quiz (5 MCQs)
+    const quizData = await genPart("quiz",
+      `Create 5 MCQs for "${subtopicTitle}" in "${subject}". ${adapt}\nReturn JSON: {"quiz": [{"question":"...","options":["A","B","C","D"],"answer":"...","explanation":"..."}]}`);
+    if (Array.isArray(quizData?.quiz)) bundle.quiz = quizData.quiz;
+
+    // 3. Practice + solved examples
+    const practiceData = await genPart("practice",
+      `For "${subtopicTitle}" in "${subject}": ${adapt}\nCreate 2 solved examples and 2 practice questions.\nReturn JSON: {"solved_examples":[{"problem":"...","solution":"...","steps":["..."]}],"practice_questions":[{"question":"...","answer":"..."}]}`);
+    if (Array.isArray(practiceData?.solved_examples)) bundle.solved_examples = practiceData.solved_examples;
+    if (Array.isArray(practiceData?.practice_questions)) bundle.practice_questions = practiceData.practice_questions;
+
+    // 4. Flashcards
+    const flashData = await genPart("flashcards",
+      `Create 5 flashcards for "${subtopicTitle}" in "${subject}". ${adapt}\nReturn JSON: {"flashcards":[{"front":"...","back":"..."}]}`);
+    if (Array.isArray(flashData?.flashcards)) bundle.flashcards = flashData.flashcards;
+
+    // Generate materials programmatically (no LLM needed)
+    const searchQ = encodeURIComponent(`${subtopicTitle} ${subject}`);
+    bundle.materials = [
+      { title: `${subtopicTitle} - Wikipedia`, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(subtopicTitle.replace(/\s+/g, '_'))}`, type: "article", description: `Wikipedia article on ${subtopicTitle}` },
+      { title: `${subtopicTitle} - Research Papers`, url: `https://scholar.google.com/scholar?q=${searchQ}`, type: "paper", description: `Academic papers on ${subtopicTitle}` },
+      { title: `${subtopicTitle} - Study Guide`, url: `https://www.khanacademy.org/search?referer=%2F&page_search_query=${searchQ}`, type: "guide", description: `Khan Academy resources for ${subtopicTitle}` }
+    ];
+
+    // Generate video search URLs programmatically
+    bundle.videos = [
+      { title: `${subtopicTitle} - Full Lecture`, url: `https://www.youtube.com/results?search_query=${searchQ}+lecture`, description: `Lecture videos on ${subtopicTitle}` },
+      { title: `${subtopicTitle} - Tutorial`, url: `https://www.youtube.com/results?search_query=${searchQ}+tutorial+explained`, description: `Tutorial videos on ${subtopicTitle}` },
+      { title: `${subtopicTitle} - Examples`, url: `https://www.youtube.com/results?search_query=${searchQ}+examples+solved`, description: `Worked examples for ${subtopicTitle}` }
+    ];
+
+    // If we have cached videos, use those instead
+    if (existing?.videos?.length) {
+      bundle.videos = existing.videos;
+    } else {
+      // Try YouTube API ranking if available
+      try {
+        if (getYoutubeApiKey()) {
+          const candidates = [];
+          const queries = [`${subtopicTitle} ${subject} lecture`, `${subtopicTitle} tutorial explained`];
+          for (const q of queries) candidates.push(...(await youtubeSearch(q, 5)));
+          const uniq = new Map();
+          for (const c of candidates) { const id = String(c?.videoId || "").trim(); if (id && !uniq.has(id)) uniq.set(id, c); }
+          const uniqList = Array.from(uniq.values());
+          if (uniqList.length) {
+            const detailsMap = await youtubeVideoDetails(uniqList.map(c => c.videoId));
+            const enriched = uniqList.map(c => ({ ...c, durationSeconds: detailsMap.get(c.videoId)?.durationSeconds ?? null }));
+            const topicText = `${subject}: ${subtopicTitle}`;
+            const concepts = await extractSubConcepts(subject, subtopicTitle);
+            const ranked = await rankYouTubeCandidates(topicText, enriched, { concepts });
+            const top = ranked.slice(0, 3);
+            if (top.length) {
+              bundle.videos = top.map(v => ({ title: v.title, url: `https://www.youtube.com/watch?v=${encodeURIComponent(v.videoId)}`, description: v.description }));
+              await upsertStoredVideos({ userId, subject, topic: subtopicTitle, version, videos: bundle.videos });
+            }
+          }
+        }
+      } catch (e) { process.stderr.write(`YouTube ranking failed: ${e?.message || e}\n`); }
+    }
+
+    // Check we got at least notes
+    if (!bundle.notes) return res.status(500).json({ error: "Failed to generate content - LLM returned no notes" });
+
+    return res.json({ ok: true, bundle, citations: [] });
   } catch (err) { return res.status(500).json({ error: err?.message || "Failed" }); }
 });
 
@@ -188,6 +239,62 @@ router.post("/api/tutor/chat", async (req, res) => {
     const content = await callOpenRouter(messages, { temperature: 0.25 });
     return res.json({ ok: true, reply: typeof content === "string" ? content : JSON.stringify(content) });
   } catch (err) { return res.status(500).json({ ok: false, error: err?.message || "Failed" }); }
+});
+
+// ── Generate Final Assessment ─────────────────────────────────────────────────
+router.post("/api/ai/final-assessment", async (req, res) => {
+  try {
+    const subject = String(req.body?.subject || "").trim();
+    const syllabus = String(req.body?.syllabus || "Standard mastery path").trim();
+    if (!subject) return res.status(400).json({ error: "Missing subject" });
+
+    const prompt = `Generate a FINAL MASTERY ASSESSMENT for the course: "${subject}".
+Context/Syllabus: ${syllabus}.
+
+REQUIREMENTS:
+1. 20 OBJECTIVE QUESTIONS (Multiple Choice). High difficulty. Each with 4 options.
+2. 10 SUBJECTIVE QUESTIONS (Open-ended). Require critical thinking.
+3. Return valid JSON.
+
+Return JSON: {"objective_questions": [{"question": "...", "options": ["A","B","C","D"], "answer": "...", "explanation": "..."}], "subjective_questions": [{"question": "...", "ideal_answer_keywords": ["..."], "difficulty": "hard"}]}`;
+
+    const content = await callOpenRouter(
+      [{ role: "system", content: "You generate strictly valid JSON and nothing else." }, { role: "user", content: prompt }],
+      { response_format: "json_object", max_tokens: 8192, temperature: 0.3 }
+    );
+    const parsed = stripJson(content);
+    if (!parsed?.objective_questions) return res.status(500).json({ error: "Invalid assessment response" });
+    return res.json({ ok: true, assessment: { ...parsed, is_completed: false } });
+  } catch (err) { return res.status(500).json({ error: err?.message || "Failed to generate assessment" }); }
+});
+
+// ── Evaluate Final Assessment ─────────────────────────────────────────────────
+router.post("/api/ai/evaluate-assessment", async (req, res) => {
+  try {
+    const subject = String(req.body?.subject || "").trim();
+    const objectiveResults = req.body?.objectiveResults;
+    const subjectiveAnswers = req.body?.subjectiveAnswers;
+    if (!subject) return res.status(400).json({ error: "Missing subject" });
+
+    const prompt = `Evaluate a student's final mastery assessment for "${subject}".
+Objective Score Details: ${JSON.stringify(objectiveResults)}
+Subjective Answers provided by student: ${JSON.stringify(subjectiveAnswers)}
+
+Analyze the subjective answers for depth and keyword presence.
+Calculate a final combined score out of 100.
+Identify 3 specific weak areas that need review.
+Provide constructive feedback in plain text.
+
+Return JSON: {"score": number, "feedback": "...", "weak_areas": ["...", "...", "..."]}`;
+
+    const content = await callOpenRouter(
+      [{ role: "system", content: "You generate strictly valid JSON and nothing else." }, { role: "user", content: prompt }],
+      { response_format: "json_object", max_tokens: 4096, temperature: 0.2 }
+    );
+    const parsed = stripJson(content);
+    if (typeof parsed?.score !== "number") return res.status(500).json({ error: "Invalid evaluation response" });
+    return res.json({ ok: true, result: parsed });
+  } catch (err) { return res.status(500).json({ error: err?.message || "Failed to evaluate" }); }
 });
 
 export default router;

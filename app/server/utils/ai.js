@@ -2,13 +2,13 @@ import https from "https";
 import { pipeline, env as xenv } from "@xenova/transformers";
 import { YoutubeTranscript } from "youtube-transcript";
 
-const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-const openRouterModel = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
-const groqApiKey = process.env.GROQ_API_KEY;
-const groqModel = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
-const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || "Xenova/all-MiniLM-L6-v2";
-export const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+// Read env vars lazily (dotenv hasn't run yet when ES module top-level code executes)
+const env = (key, fallback) => process.env[key] || fallback || "";
+function getOpenRouterApiKey() { return env("OPENROUTER_API_KEY"); }
+function getOpenRouterModel() { return env("OPENROUTER_MODEL", "arcee-ai/trinity-large-preview:free"); }
+function getFrontendUrl() { return env("FRONTEND_URL", "http://localhost:3000"); }
+const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
+export function getYoutubeApiKey() { return env("YOUTUBE_API_KEY"); }
 
 let embeddingPipelinePromise = null;
 const transcriptCache = new Map();
@@ -172,7 +172,7 @@ async function computeConceptCoverage(concepts, transcriptText) {
 }
 
 export async function youtubeSearch(query, maxResults) {
-  if (!youtubeApiKey) return [];
+  if (!getYoutubeApiKey()) return [];
   const q = String(query || "").trim();
   if (!q) return [];
   const url = new URL("https://www.googleapis.com/youtube/v3/search");
@@ -181,7 +181,7 @@ export async function youtubeSearch(query, maxResults) {
   url.searchParams.set("maxResults", String(Math.min(15, Math.max(1, Number(maxResults) || 5))));
   url.searchParams.set("q", q);
   url.searchParams.set("videoDuration", "medium");
-  url.searchParams.set("key", youtubeApiKey);
+  url.searchParams.set("key", getYoutubeApiKey());
   const res = await fetch(url.toString());
   const text = await res.text();
   let data; try { data = JSON.parse(text); } catch { return []; }
@@ -194,13 +194,13 @@ export async function youtubeSearch(query, maxResults) {
 }
 
 export async function youtubeVideoDetails(videoIds) {
-  if (!youtubeApiKey) return new Map();
+  if (!getYoutubeApiKey()) return new Map();
   const ids = Array.isArray(videoIds) ? videoIds.map((v) => String(v || "").trim()).filter(Boolean) : [];
   if (!ids.length) return new Map();
   const url = new URL("https://www.googleapis.com/youtube/v3/videos");
   url.searchParams.set("part", "contentDetails");
   url.searchParams.set("id", ids.slice(0, 50).join(","));
-  url.searchParams.set("key", youtubeApiKey);
+  url.searchParams.set("key", getYoutubeApiKey());
   const res = await fetch(url.toString());
   const text = await res.text();
   let data; try { data = JSON.parse(text); } catch { return new Map(); }
@@ -288,42 +288,112 @@ export function stripJson(text) {
   throw new Error("Failed to parse JSON response");
 }
 
-// ── LLM caller ────────────────────────────────────────────────────────────────
-export async function callOpenRouter(messages, opts = {}) {
-  const useGroq = Boolean(groqApiKey);
-  if (!useGroq && !openRouterApiKey) throw new Error("OPENROUTER_API_KEY is not set");
-  const model = String(opts.model || (useGroq ? groqModel : openRouterModel));
-  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.2;
-  let max_tokens;
-  if (typeof opts.max_tokens === "number") max_tokens = opts.max_tokens;
-  else { const envMax = Number(useGroq ? process.env.GROQ_MAX_TOKENS : process.env.OPENROUTER_MAX_TOKENS); max_tokens = Number.isFinite(envMax) && envMax > 0 ? envMax : (useGroq ? 4096 : 8192); }
-  if (useGroq && max_tokens > 4096) max_tokens = 4096;
-  const response_format = opts.response_format === "json_object" ? { type: "json_object" } : undefined;
-  const payload = JSON.stringify({ model, temperature, max_tokens, messages, ...(response_format ? { response_format } : {}) });
+// ── Ollama (local) caller ─────────────────────────────────────────────────────
+function getOllamaUrl() { return env("OLLAMA_URL", "http://127.0.0.1:11434"); }
+function getOllamaModel() { return env("OLLAMA_MODEL", "llama3.2"); }
 
-  const maxRetries = 3;
-  let retryCount = 0;
-  while (retryCount <= maxRetries) {
+async function callOllama(messages, opts = {}) {
+  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.2;
+  const wantJson = opts.response_format === "json_object";
+  const numPredict = typeof opts.num_predict === "number" ? opts.num_predict : 4096;
+  const timeoutMs = typeof opts.timeout === "number" ? opts.timeout : 120000;
+  const payload = JSON.stringify({
+    model: getOllamaModel(),
+    messages,
+    stream: false,
+    options: { temperature, num_predict: numPredict },
+    ...(wantJson ? { format: "json" } : {})
+  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${getOllamaUrl()}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    const text = await res.text();
+    let data; try { data = JSON.parse(text); } catch { throw new Error(text || "Ollama request failed"); }
+    if (!res.ok) throw new Error(data?.error || "Ollama request failed");
+    const content = data?.message?.content;
+    if (!content) throw new Error("Ollama response missing content");
+    return content;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") throw new Error(`Ollama timed out after ${timeoutMs}ms`);
+    throw err;
+  }
+}
+
+// ── Remote LLM caller (OpenRouter only) ─────────────────────────────────────
+async function callRemoteLLM(messages, opts = {}) {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set");
+  const model = String(opts.model || getOpenRouterModel());
+  const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.2;
+  const envMax = Number(process.env.OPENROUTER_MAX_TOKENS);
+  const max_tokens = typeof opts.max_tokens === "number" ? opts.max_tokens : (Number.isFinite(envMax) && envMax > 0 ? envMax : 8192);
+  const payload = JSON.stringify({ model, temperature, max_tokens, messages });
+
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const url = useGroq ? "https://api.groq.com/openai/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
-      const headers = useGroq
-        ? { "Content-Type": "application/json", Authorization: `Bearer ${groqApiKey}` }
-        : { "Content-Type": "application/json", Authorization: `Bearer ${openRouterApiKey}`, "HTTP-Referer": FRONTEND_URL, "X-Title": "SmartLearn" };
-      const res = await fetch(url, { method: "POST", headers, body: payload });
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}`, "HTTP-Referer": getFrontendUrl(), "X-Title": "SmartLearn" },
+        body: payload
+      });
       const text = await res.text();
-      let data; try { data = JSON.parse(text); } catch { throw new Error(text || "LLM request failed"); }
+      let data; try { data = JSON.parse(text); } catch { throw new Error(text || "OpenRouter request failed"); }
       if (!res.ok) {
         const msg = data?.error?.message || data?.message || JSON.stringify(data);
-        if (useGroq && res.status === 429 && retryCount < maxRetries) {
-          await new Promise(r => setTimeout(r, Math.pow(2, retryCount) * 1000));
-          retryCount++; continue;
+        if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRIES - 1) {
+          process.stderr.write(`[LLM] OpenRouter attempt ${attempt + 1} failed (${res.status}), retrying in ${(attempt + 1) * 2}s...\n`);
+          await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+          continue;
         }
         const err = new Error(msg); err.status = res.status; throw err;
       }
       const content = data?.choices?.[0]?.message?.content;
       if (data?.choices?.[0]?.finish_reason === "length") throw new Error("Model output truncated (increase max_tokens)");
-      if (!content) throw new Error("LLM response missing content");
+      if (!content) throw new Error("OpenRouter response missing content");
       return content;
-    } catch (e) { if (retryCount >= maxRetries) throw e; retryCount++; }
+    } catch (e) {
+      if (attempt < MAX_RETRIES - 1) {
+        process.stderr.write(`[LLM] OpenRouter attempt ${attempt + 1} error: ${e?.message || e}, retrying...\n`);
+        await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+// ── Main LLM caller: OpenRouter first (3 retries), Ollama local fallback ────
+export async function callOpenRouter(messages, opts = {}) {
+  const userMsg = messages?.find(m => m.role === "user")?.content || "";
+  const preview = userMsg.slice(0, 80).replace(/\n/g, " ");
+  const start = Date.now();
+
+  // Try OpenRouter first (3 retries built into callRemoteLLM)
+  try {
+    process.stdout.write(`\x1b[35m[LLM] OpenRouter (${getOpenRouterModel()}) ← "${preview}..."\x1b[0m\n`);
+    const result = await callRemoteLLM(messages, opts);
+    process.stdout.write(`\x1b[32m[LLM] OpenRouter ✓ (${Date.now() - start}ms, ${result.length} chars)\x1b[0m\n`);
+    return result;
+  } catch (remoteErr) {
+    process.stderr.write(`\x1b[33m[LLM] OpenRouter failed (${remoteErr?.message || remoteErr}), falling back to Ollama...\x1b[0m\n`);
+  }
+  // Fallback to local Ollama
+  try {
+    process.stdout.write(`\x1b[35m[LLM] Ollama (${getOllamaModel()}) ← "${preview}..."\x1b[0m\n`);
+    const result = await callOllama(messages, opts);
+    process.stdout.write(`\x1b[32m[LLM] Ollama ✓ (${Date.now() - start}ms, ${result.length} chars)\x1b[0m\n`);
+    return result;
+  } catch (ollamaErr) {
+    process.stderr.write(`\x1b[31m[LLM] Both OpenRouter & Ollama failed! Ollama: ${ollamaErr?.message}\x1b[0m\n`);
+    throw ollamaErr;
   }
 }

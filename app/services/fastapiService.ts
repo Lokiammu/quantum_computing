@@ -1,4 +1,3 @@
-import { extractTasksFromText } from "./geminiService";
 import { optimizeScheduleQAOA } from "./quantumSimulator";
 import { LearningAgent, Task, ScheduleEvent, User, ChatMessage, Difficulty, AcademicBundle, CognitiveLoadState, MasteryState } from "../types";
 import { BehavioralMetrics } from "./quantumSimulator";
@@ -155,10 +154,6 @@ export const fastapiService = {
     }
     const fallbackState = quizScore >= 70 ? MasteryState.MASTERY : quizScore >= 40 ? MasteryState.NEUTRAL : MasteryState.STRUGGLE;
     return { state: fallbackState, confidence: 0.5, source: 'client_heuristic' };
-  },
-
-  async extractTasks(rawText: string): Promise<any[]> {
-    return extractTasksFromText(rawText);
   },
 
   async getAgentResponse(

@@ -373,5 +373,55 @@
       }
     ],
     "created_at": "2026-03-15T14:48:02.849Z"
+  },
+  {
+    "id": 1773858710389,
+    "user_id": "1a13e598df0eb0f9518916a9",
+    "subject": "quantum computing",
+    "topic": "Review: What is Quantum Computing?",
+    "version": 1,
+    "videos": [
+      {
+        "title": "Quantum Computing Explained by a Retired Microsoft Engineer",
+        "url": "https://www.youtube.com/watch?v=IzGJw6daRTw",
+        "description": "Dave Plummer explains the basics of Quantum Computing (superposition, entanglement, qubits, error correction, Grover's ..."
+      },
+      {
+        "title": "Quantum Computers Explained: How Quantum Computing Works",
+        "url": "https://www.youtube.com/watch?v=B3U1NDUiwSA",
+        "description": "Quantum computers use the principles of quantum mechanics to process information in ways that classical computers can't."
+      },
+      {
+        "title": "A beginner&#39;s guide to quantum computing | Shohini Ghose",
+        "url": "https://www.youtube.com/watch?v=QuR969uMICM",
+        "description": "A quantum computer isn't just a more powerful version of the computers we use today; it's something else entirely, based on ..."
+      }
+    ],
+    "created_at": "2026-03-18T18:31:50.389Z"
+  },
+  {
+    "id": 1773859044964,
+    "user_id": "1a13e598df0eb0f9518916a9",
+    "subject": "gym",
+    "topic": "Safety Basics",
+    "version": 1,
+    "videos": [
+      {
+        "title": "Basic Safety || Basic Safety Information || Important Definitions In Safety || HSE STUDY GUIDE",
+        "url": "https://www.youtube.com/watch?v=c-LOu3vzprA",
+        "description": "hsestudyguide."
+      },
+      {
+        "title": "OCCUPATIONAL HEALTH AND SAFETY MANAGEMENT- Basic Concepts Lecture 1",
+        "url": "https://www.youtube.com/watch?v=8nbOI-0U9Co",
+        "description": "BASIC CONCEPTS IN HEALTH AND SAFETY MGT. Occupational health and safety (OHS) is a branch of public. health aimed at ..."
+      },
+      {
+        "title": "What Causes Accidents - Safety Training Video - Preventing Accidents &amp; Injuries",
+        "url": "https://www.youtube.com/watch?v=dBf6BTX1bmM",
+        "description": "What Causes Accidents - Safety Training Video - Preventing Accidents & Injuries Never miss a new safety video! Subscribe: ..."
+      }
+    ],
+    "created_at": "2026-03-18T18:37:24.964Z"
   }
 ]

@@ -4,7 +4,7 @@ import { User, LearningAgent, Task, ScheduleEvent, SubTopic, Difficulty, ChatMes
 import { firebaseService } from './services/firebaseService';
 import { fastapiService } from './services/fastapiService';
 import { authApi } from './services/authApi';
-import { gmailApi } from './services/gmailApi';
+
 import Dashboard from './components/Dashboard';
 import StudySession from './components/StudySession';
 import Planner from './components/Planner';
@@ -43,10 +43,6 @@ const App: React.FC = () => {
   const googleRenderedRef = useRef(false);
   const [googleReady, setGoogleReady] = useState(false);
 
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [gmailLastSyncAt, setGmailLastSyncAt] = useState<string | null>(null);
-  const [showGmailPrompt, setShowGmailPrompt] = useState(false);
-  const syncInProgressRef = useRef(false);
 
   useEffect(() => {
     document.title = 'SmartLearn';
@@ -83,8 +79,7 @@ const App: React.FC = () => {
       localStorage.removeItem('fb_session');
     }
   }, [currentUser]);
-  const syncTimerRef = useRef<number | null>(null);
-  
+
   const [newAgent, setNewAgent] = useState({ name: '', syllabus: '' });
   // Default to 12 days as requested for the project completion timeline
   const [timeframeValue, setTimeframeValue] = useState(12);
@@ -100,455 +95,6 @@ const App: React.FC = () => {
       firebaseService.getTasks(currentUser.uid).then(setTasks).catch(() => {});
       firebaseService.getSchedule(currentUser.uid).then(setSchedule).catch(() => {});
     }
-  }, [currentUser]);
-
-  const refreshGmailStatus = async (uid: string) => {
-    const status = await gmailApi.status(uid);
-    setGmailConnected(status.connected);
-    setGmailLastSyncAt(status.lastSyncAt || null);
-  };
-
-  const connectGmail = async (uid: string) => {
-    const url = await gmailApi.getOAuthUrl(uid);
-    window.location.href = url;
-  };
-
-  const disconnectGmail = async (uid: string) => {
-    await gmailApi.disconnect(uid);
-    setGmailConnected(false);
-    setGmailLastSyncAt(null);
-  };
-
-  const mergeImportedTasks = async (uid: string, incoming: any[]) => {
-    const incomingArr = Array.isArray(incoming) ? incoming : [];
-    let invalidDeadlineCount = 0;
-    let expiredDeadlineCount = 0;
-
-    const now = Date.now();
-
-    const normalizedIncoming = incomingArr
-      .map((t: any) => {
-        const deadlineDate = new Date(t?.deadline);
-        if (Number.isNaN(deadlineDate.getTime())) {
-          invalidDeadlineCount += 1;
-          return null;
-        }
-
-        if (deadlineDate.getTime() < now) {
-          expiredDeadlineCount += 1;
-          return null;
-        }
-
-        const title = String(t?.title || '').trim();
-        if (!title) return null;
-        return {
-          id: Math.random().toString(36).substr(2, 9),
-          user_id: uid,
-          title,
-          deadline: deadlineDate.toISOString(),
-          priority: (t?.priority === 'high' || t?.priority === 'medium' || t?.priority === 'low') ? t.priority : 'medium',
-          source: 'Email'
-        };
-      })
-      .filter(Boolean) as any[];
-
-    const persistedTasks = await firebaseService.getTasks(uid);
-    const existingTasks = [...persistedTasks, ...tasks].filter((t, idx, arr) => {
-      if (!t) return false;
-      if (t.user_id !== uid) return false;
-      const key = `${String(t.title || '').toLowerCase()}|${new Date(t.deadline).toISOString().slice(0, 16)}`;
-      return arr.findIndex(o => `${String(o.title || '').toLowerCase()}|${new Date(o.deadline).toISOString().slice(0, 16)}` === key) === idx;
-    });
-    const existingTaskKey = new Set(existingTasks.map(p => `${p.title.toLowerCase()}|${new Date(p.deadline).toISOString().slice(0, 16)}`));
-    const taskAdditions = normalizedIncoming.filter((t: any) => {
-      const key = `${t.title.toLowerCase()}|${new Date(t.deadline).toISOString().slice(0, 16)}`;
-      if (existingTaskKey.has(key)) return false;
-      existingTaskKey.add(key);
-      return true;
-    });
-
-    const mergedTasks = [...taskAdditions, ...existingTasks];
-    firebaseService.saveTasks(uid, mergedTasks);
-    setTasks(mergedTasks);
-
-    const persistedSchedule = await firebaseService.getSchedule(uid);
-    const existingSchedule = [...persistedSchedule, ...schedule].filter((e, idx, arr) => {
-      if (!e) return false;
-      if (e.user_id !== uid) return false;
-      const key = `${e.type}|${String(e.title || '').toLowerCase()}|${new Date(e.start_time).toISOString().slice(0, 16)}`;
-      return arr.findIndex(o => `${o.type}|${String(o.title || '').toLowerCase()}|${new Date(o.start_time).toISOString().slice(0, 16)}` === key) === idx;
-    });
-    const existingEventKey = new Set(existingSchedule.map(e => `${e.type}|${e.title.toLowerCase()}|${new Date(e.start_time).toISOString().slice(0, 16)}`));
-    const deadlineEvents: ScheduleEvent[] = normalizedIncoming.map((t: any) => {
-      const start = new Date(t.deadline);
-      const end = new Date(start);
-      end.setMinutes(start.getMinutes() + 15);
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        user_id: uid,
-        title: `Deadline: ${t.title}`,
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
-        type: 'deadline' as const
-      };
-    }).filter(ev => {
-      const key = `${ev.type}|${ev.title.toLowerCase()}|${new Date(ev.start_time).toISOString().slice(0, 16)}`;
-      if (existingEventKey.has(key)) return false;
-      existingEventKey.add(key);
-      return true;
-    });
-
-    const mergedSchedule = [...deadlineEvents, ...existingSchedule];
-    firebaseService.saveSchedule(uid, mergedSchedule);
-    setSchedule(mergedSchedule);
-
-    return {
-      extractedCount: incomingArr.length,
-      invalidDeadlineCount,
-      expiredDeadlineCount,
-      validCount: normalizedIncoming.length,
-      addedTasks: taskAdditions.length,
-      addedEvents: deadlineEvents.length
-    };
-  };
-
-  const syncTasksFromGmail = async (opts?: { silent?: boolean }) => {
-    if (!currentUser) return;
-    if (syncInProgressRef.current) {
-      if (!opts?.silent) alert('Gmail sync is already in progress. Please wait a moment and try again.');
-      return;
-    }
-
-    syncInProgressRef.current = true;
-    try {
-      const uid = currentUser.uid;
-      const status = await gmailApi.status(uid);
-      setGmailConnected(status.connected);
-      setGmailLastSyncAt(status.lastSyncAt || null);
-
-      if (!status.connected) {
-        if (!opts?.silent) alert('Please connect Gmail first.');
-        return;
-      }
-
-      const dailyKey = `gmail_full_rescan_at_${uid}`;
-      const lastFull = Number(localStorage.getItem(dailyKey) || '0');
-      const shouldFullRescan = opts?.silent ? (Date.now() - lastFull > 24 * 60 * 60 * 1000) : true;
-      const query = shouldFullRescan ? 'newer_than:180d' : 'newer_than:30d';
-      const force = shouldFullRescan;
-
-      let pageToken: string | undefined = undefined;
-      const collected: any[] = [];
-      let pages = 0;
-      const maxPages = shouldFullRescan ? 6 : 2;
-      const perPage = 50;
-
-      while (pages < maxPages) {
-        const page = await gmailApi.fetchMessages(uid, { q: query, max: perPage, force, pageToken });
-        collected.push(...page.messages);
-        pageToken = page.nextPageToken || undefined;
-        pages += 1;
-        if (!pageToken) break;
-      }
-
-      if (!collected.length) {
-        if (!opts?.silent) alert('No emails found to scan.');
-        return;
-      }
-
-      const maxToProcess = shouldFullRescan ? 120 : 40;
-      const toProcess = collected.slice(0, maxToProcess);
-      const allExtracted: any[] = [];
-
-      const isNoiseEmail = (m: any) => {
-        const from = String(m?.from || '').toLowerCase();
-        const subject = String(m?.subject || '').toLowerCase();
-        const snippet = String(m?.snippet || '').toLowerCase();
-        const body = String(m?.body || '').toLowerCase();
-        const headerHay = `${from} ${subject}`;
-        const contentHay = `${subject} ${snippet} ${body}`;
-
-        const noisePhrases = [
-          'verification code',
-          'security code',
-          'one-time password',
-          'one time password',
-          'two-factor',
-          'two factor',
-          'password reset',
-          'reset your password',
-          'login code',
-          'sign-in code',
-          'sign in code',
-          'verify your email',
-          'confirm your email'
-        ];
-
-        if (noisePhrases.some(p => headerHay.includes(p))) return true;
-
-        if (/\botp\b/.test(headerHay) || /\b2fa\b/.test(headerHay)) return true;
-
-        const strongOtpSignal = /(otp|one[- ]time password|verification code|security code|login code|sign[- ]in code)[^\d]{0,30}\b\d{4,8}\b/i;
-        if (strongOtpSignal.test(contentHay)) return true;
-
-        return false;
-      };
-
-      const isNoiseTaskTitle = (t: any) => {
-        const title = String(t?.title || '').toLowerCase();
-        if (!title) return true;
-        if (/\botp\b/.test(title)) return true;
-        const bad = ['verification code', 'security code', 'login code', 'password reset', 'verify email'];
-        return bad.some(b => title.includes(b));
-      };
-
-      let skippedNoise = 0;
-      let processed = 0;
-      let skippedNoDeadlineSignal = 0;
-      let extractionFailures = 0;
-      let emptyExtractions = 0;
-      let firstExtractionError: string | null = null;
-
-      const monthIndex = (m: string) => {
-        const key = m.slice(0, 3).toLowerCase();
-        const months: Record<string, number> = {
-          jan: 0,
-          feb: 1,
-          mar: 2,
-          apr: 3,
-          may: 4,
-          jun: 5,
-          jul: 6,
-          aug: 7,
-          sep: 8,
-          oct: 9,
-          nov: 10,
-          dec: 11
-        };
-        return months[key];
-      };
-
-      const normalizeDeadline = (d: Date, hasTime: boolean) => {
-        const out = new Date(d);
-        if (!hasTime) {
-          out.setHours(23, 59, 0, 0);
-        }
-        return out;
-      };
-
-      const inferYear = (month0: number, day: number, yearMaybe?: number) => {
-        const now = new Date();
-        const y = typeof yearMaybe === 'number' && yearMaybe >= 100 ? yearMaybe : now.getFullYear();
-        const candidate = new Date(y, month0, day, 23, 59, 0, 0);
-        if (candidate.getTime() < now.getTime() - 24 * 60 * 60 * 1000) {
-          candidate.setFullYear(y + 1);
-        }
-        return candidate;
-      };
-
-      const parseDeadlineFromText = (text: string) => {
-        const t = String(text || '');
-        const tl = t.toLowerCase();
-
-        const dueWindowMatch = tl.match(/\b(due|deadline|submit(?:\s+by)?|submission|exam|test|quiz|last\s+date(?:\s+to)?)\b[\s\S]{0,120}/i);
-        const scope = dueWindowMatch ? t.slice(dueWindowMatch.index || 0, (dueWindowMatch.index || 0) + (dueWindowMatch[0]?.length || 0)) : t;
-
-        const iso = scope.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
-        if (iso) {
-          const year = Number(iso[1]);
-          const month0 = Number(iso[2]) - 1;
-          const day = Number(iso[3]);
-          const hasTime = typeof iso[4] !== 'undefined' && typeof iso[5] !== 'undefined';
-          const hour = hasTime ? Number(iso[4]) : 23;
-          const minute = hasTime ? Number(iso[5]) : 59;
-          const dt = new Date(year, month0, day, hour, minute, 0, 0);
-          return normalizeDeadline(dt, hasTime);
-        }
-
-        const mdy = scope.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
-        if (mdy) {
-          let a = Number(mdy[1]);
-          let b = Number(mdy[2]);
-          let yRaw = mdy[3] ? Number(mdy[3]) : undefined;
-          if (typeof yRaw === 'number' && yRaw < 100) yRaw = 2000 + yRaw;
-
-          let day = a;
-          let month0 = b - 1;
-          if (b > 12 && a <= 12) {
-            day = b;
-            month0 = a - 1;
-          }
-          const inferred = inferYear(month0, day, yRaw);
-          return normalizeDeadline(inferred, false);
-        }
-
-        const monthName1 = scope.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(20\d{2}))?/i);
-        if (monthName1) {
-          const month0 = monthIndex(monthName1[1]);
-          const day = Number(monthName1[2]);
-          const yearMaybe = monthName1[3] ? Number(monthName1[3]) : undefined;
-          const inferred = inferYear(month0, day, yearMaybe);
-          return normalizeDeadline(inferred, false);
-        }
-
-        const monthName2 = scope.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b(?:,?\s*(20\d{2}))?/i);
-        if (monthName2) {
-          const day = Number(monthName2[1]);
-          const month0 = monthIndex(monthName2[2]);
-          const yearMaybe = monthName2[3] ? Number(monthName2[3]) : undefined;
-          const inferred = inferYear(month0, day, yearMaybe);
-          return normalizeDeadline(inferred, false);
-        }
-
-        return null;
-      };
-
-      const extractDeadlineTasksHeuristic = (m: any) => {
-        const subject = String(m?.subject || '').trim();
-        const text = `${subject}\n${m?.snippet || ''}\n${m?.body || ''}`;
-        const deadline = parseDeadlineFromText(text);
-        if (!deadline) return [];
-
-        if (deadline.getTime() < Date.now()) return [];
-
-        const lowSubject = subject.toLowerCase();
-        const priority = (lowSubject.includes('urgent') || lowSubject.includes('asap') || lowSubject.includes('today') || lowSubject.includes('tomorrow')) ? 'high' : 'medium';
-
-        return [
-          {
-            title: subject || 'Email deadline',
-            deadline: deadline.toISOString(),
-            priority,
-            source: 'Email'
-          }
-        ];
-      };
-
-      const hasDeadlineSignal = (m: any) => {
-        const hay = `${m?.subject || ''} ${m?.snippet || ''} ${m?.body || ''}`.toLowerCase();
-        const signals = [
-          'due',
-          'deadline',
-          'submit',
-          'submission',
-          'exam',
-          'test',
-          'quiz',
-          'assignment',
-          'project',
-          'presentation',
-          'viva',
-          'register',
-          'registration',
-          'fee',
-          'payment',
-          'last date',
-          'before',
-          'by '
-        ];
-
-        if (signals.some(s => hay.includes(s))) return true;
-        if (/\b\d{1,2}[\/-]\d{1,2}([\/-]\d{2,4})?\b/.test(hay)) return true;
-        if (/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(hay)) return true;
-        return false;
-      };
-
-      const candidates: any[] = [];
-
-      for (const m of toProcess) {
-        if (isNoiseEmail(m)) {
-          skippedNoise += 1;
-          continue;
-        }
-        processed += 1;
-        if (!hasDeadlineSignal(m)) {
-          skippedNoDeadlineSignal += 1;
-          continue;
-        }
-        candidates.push(m);
-      }
-
-      for (const m of candidates) {
-        try {
-          const extracted = extractDeadlineTasksHeuristic(m);
-          if (Array.isArray(extracted) && extracted.length) {
-            const filtered = extracted.filter((t: any) => !isNoiseTaskTitle(t));
-            allExtracted.push(...filtered);
-          } else {
-            emptyExtractions += 1;
-          }
-        } catch (err: any) {
-          extractionFailures += 1;
-          const msg = String(err?.message || err || 'Unknown error');
-          if (!firstExtractionError) firstExtractionError = msg;
-        }
-      }
-
-      const summary = await mergeImportedTasks(uid, allExtracted);
-
-      if (shouldFullRescan) {
-        localStorage.setItem(dailyKey, String(Date.now()));
-      }
-
-      if (!opts?.silent) {
-        if (summary.validCount === 0) {
-          const diag = `processed: ${processed}, skippedNoise: ${skippedNoise}, skippedNoSignal: ${skippedNoDeadlineSignal}, candidates: ${candidates.length}, empty: ${emptyExtractions}, failed: ${extractionFailures}`;
-          const errLine = firstExtractionError ? `\nFirst error: ${firstExtractionError}` : '';
-          alert(`Scanned ${toProcess.length} emails (${diag}). Extracted ${summary.extractedCount} items, but 0 were usable (expired: ${summary.expiredDeadlineCount}, invalid: ${summary.invalidDeadlineCount}).${errLine}`);
-        } else {
-          alert(`Scanned ${toProcess.length} emails (processed: ${processed}, skipped: ${skippedNoise}). Added ${summary.addedTasks} tasks. Filtered expired: ${summary.expiredDeadlineCount}.`);
-        }
-      }
-
-      await refreshGmailStatus(uid);
-    } catch (err: any) {
-      if (!opts?.silent) alert(err.message || 'Failed to sync from Gmail.');
-    } finally {
-      syncInProgressRef.current = false;
-    }
-  };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const gmail = params.get('gmail');
-    if (!gmail) return;
-
-    params.delete('gmail');
-    const next = params.toString();
-    const url = `${window.location.pathname}${next ? `?${next}` : ''}`;
-    window.history.replaceState({}, '', url);
-
-    if (gmail === 'connected') {
-      alert('Gmail connected.');
-      if (currentUser) {
-        refreshGmailStatus(currentUser.uid).then(() => syncTasksFromGmail({ silent: true }));
-      }
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    refreshGmailStatus(currentUser.uid)
-      .then(() => syncTasksFromGmail({ silent: true }))
-      .catch(() => {});
-
-    const dismissedKey = `gmail_prompt_dismissed_${currentUser.uid}`;
-    if (!localStorage.getItem(dismissedKey)) {
-      gmailApi.status(currentUser.uid).then(s => {
-        if (!s.connected) setShowGmailPrompt(true);
-      }).catch(() => {});
-    }
-
-    if (syncTimerRef.current) window.clearInterval(syncTimerRef.current);
-    syncTimerRef.current = window.setInterval(() => {
-      syncTasksFromGmail({ silent: true });
-    }, 5 * 60 * 1000);
-
-    return () => {
-      if (syncTimerRef.current) window.clearInterval(syncTimerRef.current);
-      syncTimerRef.current = null;
-    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -1155,41 +701,6 @@ const App: React.FC = () => {
         onLogout={() => setCurrentUser(null)} 
       />
 
-      {showGmailPrompt && currentUser && (
-        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 sm:p-10 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-300 space-y-6">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Connect Email</p>
-              <h3 className="text-2xl font-black tracking-tight">Import tasks from Gmail?</h3>
-              <p className="text-sm font-bold text-slate-600">Grant read-only permission so SmartLearn can detect deadlines and add them to your scheduler automatically.</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={async () => {
-                  try {
-                    await connectGmail(currentUser.uid);
-                  } catch (e: any) {
-                    alert(e.message || 'Failed to start Gmail connection.');
-                  }
-                }}
-                className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg"
-              >
-                Connect Gmail
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.setItem(`gmail_prompt_dismissed_${currentUser.uid}`, '1');
-                  setShowGmailPrompt(false);
-                }}
-                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-black uppercase tracking-widest hover:bg-slate-200"
-              >
-                Not Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <main className="flex-1 overflow-y-auto pb-32">
         {activeScreen === 'home' && (
           <div className="p-6 max-w-5xl mx-auto space-y-10 animate-in fade-in duration-500">
@@ -1227,49 +738,98 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="max-w-4xl mx-auto space-y-10 pb-24">
-                <button onClick={() => setSelectedAgentId(null)} className="text-xs font-bold text-indigo-600 hover:-translate-x-1 transition-transform">← Back to Subjects</button>
-                <div className="flex justify-between items-end border-b pb-10">
-                   <div>
-                      <h2 className="text-5xl font-black tracking-tighter">{currentAgent?.subject}</h2>
-                      <p className="text-slate-500 font-medium mt-2">Daily Roadmap Optimized by SmartLearn AI</p>
-                   </div>
-                   {currentAgent?.progress === 100 && (
-                     <div className="p-4 bg-emerald-50 rounded-2xl flex items-center gap-3 border border-emerald-100">
-                       <Sparkles className="text-emerald-500" size={24}/>
-                       <span className="text-sm font-black text-emerald-700">Course Ready for Final Validation</span>
-                     </div>
-                   )}
+                <button onClick={() => setSelectedAgentId(null)} className="text-xs font-bold text-indigo-200 hover:text-white hover:-translate-x-1 transition-all inline-flex items-center gap-1">
+                  <span className="text-lg leading-none">←</span> Back to Subjects
+                </button>
+
+                {/* Subject Header */}
+                <div className="figma-glass-blue p-10 md:p-12 rounded-[3rem] relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2" />
+                  <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200/70 mb-2">Learning Roadmap</p>
+                      <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">{currentAgent?.subject}</h2>
+                      <p className="text-white/50 font-bold text-sm mt-2">Daily Roadmap Optimized by SmartLearn AI</p>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-4xl font-black text-white">{currentAgent?.progress}%</p>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200/60">Progress</p>
+                      </div>
+                      {currentAgent?.progress === 100 && (
+                        <div className="px-5 py-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl flex items-center gap-2 border border-emerald-400/30">
+                          <Sparkles className="text-emerald-300" size={18}/>
+                          <span className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Ready for Final</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-16">
+                <div className="space-y-14">
                    {currentAgent?.roadmap.map((mod) => (
-                     <div key={mod.id} className="space-y-8">
-                        <h4 className="font-black text-2xl border-l-4 border-indigo-600 pl-6">{mod.title}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div key={mod.id} className="space-y-6">
+                        <h4 className="font-black text-xl text-white border-l-4 border-indigo-400 pl-5">{mod.title}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                            {mod.subtopics.map(sub => (
-                             <div key={sub.id} onClick={() => setActiveSession({ agentId: selectedAgentId!, subtopic: sub })} className={`p-6 rounded-3xl border-2 transition-all cursor-pointer flex flex-col justify-between group ${sub.is_review ? 'bg-amber-50 border-amber-200 hover:border-amber-400' : sub.is_completed ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-100 hover:border-indigo-400'}`}>
-                                <div>
-                                  <div className="flex justify-between items-center mb-4">
-                                    <span className={`text-[10px] font-black px-3 py-1 rounded ${sub.is_review ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white'}`}>{sub.is_review ? '🔄 Review' : `Day ${sub.day_number}`}</span>
+                             <div
+                               key={sub.id}
+                               onClick={() => setActiveSession({ agentId: selectedAgentId!, subtopic: sub })}
+                               className={`group relative p-6 rounded-[2rem] border cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
+                                 sub.is_review
+                                   ? 'figma-glass border-amber-400/30 hover:border-amber-400/60'
+                                   : sub.is_completed
+                                     ? 'figma-glass border-emerald-400/30 hover:border-emerald-400/60'
+                                     : 'figma-glass border-white/20 hover:border-indigo-400/50'
+                               }`}
+                             >
+                                {/* Subtle hover glow */}
+                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
+                                  sub.is_review ? 'bg-gradient-to-br from-amber-500/10 to-transparent'
+                                  : sub.is_completed ? 'bg-gradient-to-br from-emerald-500/10 to-transparent'
+                                  : 'bg-gradient-to-br from-indigo-500/10 to-transparent'
+                                }`} />
+
+                                <div className="relative z-10">
+                                  <div className="flex justify-between items-center mb-5">
+                                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg ${
+                                      sub.is_review
+                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                        : sub.is_completed
+                                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                          : 'bg-white/10 text-white/80 border border-white/20'
+                                    }`}>
+                                      {sub.is_review ? 'Review' : `Day ${sub.day_number}`}
+                                    </span>
                                     <div className="flex items-center gap-2">
                                       {typeof sub.quiz_score === 'number' && (
-                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded ${sub.quiz_score >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{sub.quiz_score}%</span>
+                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
+                                          sub.quiz_score >= 70
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                            : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                                        }`}>{sub.quiz_score}%</span>
                                       )}
-                                      <span className="text-[9px] font-bold text-slate-400 uppercase">{sub.difficulty}</span>
+                                      <span className="text-[9px] font-bold text-white/40 uppercase">{sub.difficulty}</span>
                                     </div>
                                   </div>
-                                  <h5 className={`font-black text-lg ${sub.is_review ? 'group-hover:text-amber-600' : 'group-hover:text-indigo-600'}`}>{sub.title}</h5>
+                                  <h5 className="font-black text-lg text-white group-hover:text-white leading-snug">{sub.title}</h5>
                                   {sub.is_review && sub.weak_concepts && sub.weak_concepts.length > 0 && (
-                                    <p className="text-xs font-medium text-amber-600 mt-2">Focus: {sub.weak_concepts.slice(0, 3).join(', ')}</p>
+                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                      {sub.weak_concepts.slice(0, 3).map((c, i) => (
+                                        <span key={i} className="text-[9px] font-bold bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">{c.length > 30 ? c.slice(0, 30) + '...' : c}</span>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                                <div className="mt-8 pt-4 border-t border-slate-50 text-[10px] font-black uppercase tracking-widest">
+                                <div className="relative z-10 mt-6 pt-4 border-t border-white/10 text-[10px] font-black uppercase tracking-widest">
                                   {sub.is_completed ? (
-                                    <span className="text-emerald-600">Completed ✓</span>
+                                    <span className="text-emerald-400 flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Completed
+                                    </span>
                                   ) : sub.is_review ? (
-                                    <span className="text-amber-600">Start Review Session →</span>
+                                    <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review Session →</span>
                                   ) : (
-                                    <span className="text-indigo-600">Start Adaptive Lesson →</span>
+                                    <span className="text-indigo-300 group-hover:text-white transition-colors">Start Adaptive Lesson →</span>
                                   )}
                                 </div>
                              </div>
@@ -1278,36 +838,40 @@ const App: React.FC = () => {
                      </div>
                    ))}
 
-                   {/* Final Assessment Section at Bottom */}
-                   <div className="pt-24 border-t-2 border-dashed border-slate-100 text-center space-y-8">
-                      <div className="w-20 h-20 bg-slate-900 text-white rounded-[2rem] mx-auto flex items-center justify-center shadow-xl">
+                   {/* Final Assessment Section */}
+                   <div className="pt-16 border-t border-white/10 text-center space-y-8">
+                      <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-[2rem] mx-auto flex items-center justify-center shadow-2xl shadow-indigo-500/30 border border-white/20">
                         <Trophy size={32}/>
                       </div>
                       <div className="max-w-md mx-auto">
-                        <h4 className="text-3xl font-black italic tracking-tighter">Course Mastery Terminal</h4>
-                        <p className="text-slate-500 font-medium mt-2">Validate your total understanding with a rigorous 30-question final challenge.</p>
+                        <h4 className="text-3xl font-black italic tracking-tight text-white">Course Mastery Terminal</h4>
+                        <p className="text-white/50 font-bold text-sm mt-2">Validate your total understanding with a rigorous 30-question final challenge.</p>
                       </div>
-                      
+
                       {currentAgent?.final_assessment?.is_completed ? (
-                        <div className="bg-indigo-50 p-10 rounded-[3.5rem] border-2 border-indigo-100 animate-in zoom-in-95">
-                          <p className="text-[10px] font-black uppercase text-indigo-500 tracking-widest mb-2">Assessment Results</p>
-                          <p className="text-6xl font-black italic text-indigo-600 mb-6">{currentAgent.final_assessment.score}%</p>
+                        <div className="figma-glass-blue p-10 rounded-[3rem] border border-indigo-400/30 animate-in zoom-in-95">
+                          <p className="text-[10px] font-black uppercase text-indigo-300 tracking-widest mb-2">Assessment Results</p>
+                          <p className="text-6xl font-black italic text-white mb-6">{currentAgent.final_assessment.score}%</p>
                           <div className="text-left space-y-4">
-                             <p className="text-sm font-bold text-indigo-900 italic leading-relaxed">"{currentAgent.final_assessment.feedback}"</p>
-                             <button onClick={() => setIsFinalAssessmentOpen(true)} className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-600 underline">Retake Mastery Challenge</button>
+                             <p className="text-sm font-bold text-indigo-100 italic leading-relaxed">"{currentAgent.final_assessment.feedback}"</p>
+                             <button onClick={() => setIsFinalAssessmentOpen(true)} className="text-[10px] font-black uppercase text-indigo-300 hover:text-white underline transition-colors">Retake Mastery Challenge</button>
                           </div>
                         </div>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => setIsFinalAssessmentOpen(true)}
-                          className={`w-full max-w-md py-7 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl transition-all ${currentAgent?.progress === 100 ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                          className={`w-full max-w-md py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-2xl transition-all duration-300 ${
+                            currentAgent?.progress === 100
+                              ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:shadow-indigo-500/40 hover:-translate-y-1 border border-white/20'
+                              : 'bg-white/5 text-white/30 cursor-not-allowed border border-white/10'
+                          }`}
                           disabled={currentAgent?.progress !== 100}
                         >
                           {currentAgent?.progress === 100 ? 'Launch Final Mastery Challenge' : `Complete All Lessons (${currentAgent?.progress}%)`}
                         </button>
                       )}
                       {currentAgent?.progress !== 100 && (
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mastery node unlocks at 100% roadmap completion.</p>
+                        <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Mastery node unlocks at 100% roadmap completion.</p>
                       )}
                    </div>
                 </div>
@@ -1324,21 +888,6 @@ const App: React.FC = () => {
             agents={agents}
             onLogout={() => setCurrentUser(null)}
             onUpdateUser={(u) => setCurrentUser(u)}
-            gmailConnected={gmailConnected}
-            gmailLastSyncAt={gmailLastSyncAt}
-            onConnectGmail={async () => {
-              try {
-                await connectGmail(currentUser.uid);
-              } catch (e: any) {
-                alert(e.message || 'Failed to start Gmail connection.');
-              }
-            }}
-            onImportGmailTasks={async () => {
-              await syncTasksFromGmail({ silent: false });
-            }}
-            onDisconnectGmail={async () => {
-              await disconnectGmail(currentUser.uid);
-            }}
           />
         )}
       </main>

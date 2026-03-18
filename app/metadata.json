@@ -1,7 +1,7 @@
 
 {
   "name": "SmartLearn: Personalized Learning Scheduler",
-  "description": "Architecture: Mobile-first Flutter Frontend, FastAPI Backend, supported by PostgreSQL and Firebase. Driven by Gemini 3 and Quantum-inspired optimization.",
+  "description": "Adaptive learning platform with React frontend, Express/MongoDB backend, OpenRouter LLM + Ollama local fallback, and QSVM cognitive load detection.",
   "requestFramePermissions": [
     "camera"
   ]
