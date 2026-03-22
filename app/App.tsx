@@ -105,12 +105,12 @@ const App: React.FC = () => {
       subtopics: m.subtopics.map(s => {
         // Ensure module_id is set
         const needsModuleId = !s.module_id || s.module_id !== m.id;
-        // Check for duplicate ID across modules
+        // Check for duplicate ID across modules — preserve completion status
         if (seenIds.has(s.id)) {
           changed = true;
           const newId = `${m.id}_${s.id}_${Math.random().toString(36).substr(2, 4)}`;
           seenIds.add(newId);
-          return { ...s, id: newId, module_id: m.id, is_completed: false };
+          return { ...s, id: newId, module_id: m.id };
         }
         seenIds.add(s.id);
         if (needsModuleId) {
@@ -126,7 +126,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      firebaseService.getAgents(currentUser.uid).then(loaded => {
+      firebaseService.getAgents(currentUser.uid).then(async loaded => {
         const corrected = loaded.map(a => {
           // Fix duplicate subtopic IDs from legacy data
           let fixed = deduplicateSubtopicIds(a);
@@ -134,13 +134,19 @@ const App: React.FC = () => {
           const correctProgress = recalculateProgress(fixed);
           if (fixed.progress !== correctProgress || fixed !== a) {
             fixed = { ...fixed, progress: correctProgress };
-            firebaseService.saveAgent(fixed); // persist corrections
-            return fixed;
           }
           return fixed;
         });
         setAgents(corrected);
-      }).catch(() => {});
+        // Persist any corrections after setting state
+        for (const fixed of corrected) {
+          const original = loaded.find(a => a.id === fixed.id);
+          if (fixed !== original) {
+            try { await firebaseService.saveAgent(fixed); }
+            catch (e) { console.error('[SAVE] Failed to persist agent corrections:', fixed.id, e); }
+          }
+        }
+      }).catch(e => console.error('[LOAD] Failed to load agents:', e));
       firebaseService.getTasks(currentUser.uid).then(setTasks).catch(() => {});
       firebaseService.getSchedule(currentUser.uid).then(setSchedule).catch(() => {});
     }
@@ -358,7 +364,7 @@ const App: React.FC = () => {
     let revisionBlock = '';
     if (weakConcepts.length > 0) {
       const lines = weakConcepts.map((w, i) => `${i + 1}. ${w}`).join('\n');
-      revisionBlock = `\n\n📝 REVISION FROM PREVIOUS LESSON (${activeSession.subtopic.title})\n${'─'.repeat(50)}\nYou missed ${weakConcepts.length} question(s) in the previous quiz. Review these concepts:\n\n${lines}\n\n${'─'.repeat(50)}\n`;
+      revisionBlock = `\n\n--- REVISION FROM PREVIOUS LESSON (${activeSession.subtopic.title}) ---\nYou missed ${weakConcepts.length} question(s) in the previous quiz. Review these concepts:\n\n${lines}\n\n---\n`;
     }
 
     // Determine if we need a full review subtopic (only for severe struggle)
@@ -370,141 +376,150 @@ const App: React.FC = () => {
           shouldInjectReview = true;
         }
       } catch {
-        shouldInjectReview = true; // be safe — inject review on error
+        shouldInjectReview = true;
       }
     }
-    
-    setAgents(prev => {
-      const newAgents = prev.map(a => {
-        if (a.id !== activeSession.agentId) return a;
-        
-        // Match subtopic by BOTH id and module_id to prevent cross-module collisions
-        const targetSubId = activeSession.subtopic.id;
-        const targetModId = activeSession.subtopic.module_id;
-        let updatedRoadmap: Module[] = a.roadmap.map(m => ({
-          ...m,
-          subtopics: m.subtopics.map(s => {
-            const idMatch = s.id === targetSubId;
-            const modMatch = !targetModId || m.id === targetModId || s.module_id === targetModId;
-            return (idMatch && modMatch)
-              ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined }
-              : s;
-          })
-        }));
 
-        // Find the next subtopic and prepend revision content to its notes
-        if (revisionBlock) {
-          let foundCurrent = false;
-          for (const mod of updatedRoadmap) {
-            for (const sub of mod.subtopics) {
-              if (sub.id === activeSession.subtopic.id) {
-                foundCurrent = true;
-                continue;
-              }
-              if (foundCurrent && !sub.is_completed) {
-                // Prepend revision into existing bundle notes, or store for later
-                if (sub.bundle?.notes) {
-                  sub.bundle = { ...sub.bundle, notes: revisionBlock + sub.bundle.notes };
-                } else {
-                  // Store revision for when this subtopic gets synthesized
-                  sub.weak_concepts = weakConcepts;
-                }
-                break; // only inject into the immediate next subtopic
-              }
+    // Build the updated agent OUTSIDE the state updater so we can await the save
+    const currentAgentSnapshot = agents.find(a => a.id === activeSession.agentId);
+    if (!currentAgentSnapshot) { setActiveSession(null); return; }
+
+    const targetSubId = activeSession.subtopic.id;
+    const targetModId = activeSession.subtopic.module_id;
+    let updatedRoadmap: Module[] = currentAgentSnapshot.roadmap.map(m => ({
+      ...m,
+      subtopics: m.subtopics.map(s => {
+        const idMatch = s.id === targetSubId;
+        const modMatch = !targetModId || m.id === targetModId || s.module_id === targetModId;
+        return (idMatch && modMatch)
+          ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined }
+          : s;
+      })
+    }));
+
+    // Find the next subtopic and prepend revision content to its notes
+    if (revisionBlock) {
+      let foundCurrent = false;
+      outerLoop:
+      for (const mod of updatedRoadmap) {
+        for (const sub of mod.subtopics) {
+          if (sub.id === activeSession.subtopic.id) {
+            foundCurrent = true;
+            continue;
+          }
+          if (foundCurrent && !sub.is_completed) {
+            if (sub.bundle?.notes) {
+              sub.bundle = { ...sub.bundle, notes: revisionBlock + sub.bundle.notes };
+            } else {
+              sub.weak_concepts = weakConcepts;
             }
-            if (foundCurrent) break;
+            break outerLoop;
           }
         }
+      }
+    }
 
-        // Inject a full review subtopic only for severe struggle (< 40%) — skip if one already exists
-        const existingReview = updatedRoadmap.some(m => m.subtopics.some(s => s.is_review && s.review_of === activeSession.subtopic.id));
-        if (shouldInjectReview && weakConcepts.length > 0 && !existingReview) {
-          const currentSub = activeSession.subtopic;
-          const reviewSubtopic: SubTopic = {
-            id: `review_${currentSub.id}_${Date.now()}`,
-            module_id: currentSub.module_id,
-            title: `Review: ${currentSub.title}`,
-            day_number: currentSub.day_number + 0.5,
-            daily_goals: ['Reinforce weak concepts', 'Practice missed areas'],
-            difficulty: Difficulty.EASY,
-            is_completed: false,
-            is_review: true,
-            review_of: currentSub.id,
-            weak_concepts: weakConcepts
-          };
+    // Inject a full review subtopic only for severe struggle (< 40%) — skip if one already exists
+    const existingReview = updatedRoadmap.some(m => m.subtopics.some(s => s.is_review && s.review_of === activeSession.subtopic.id));
+    if (shouldInjectReview && weakConcepts.length > 0 && !existingReview) {
+      const currentSub = activeSession.subtopic;
+      const reviewSubtopic: SubTopic = {
+        id: `review_${currentSub.id}_${Date.now()}`,
+        module_id: currentSub.module_id,
+        title: `Review: ${currentSub.title}`,
+        day_number: currentSub.day_number + 0.5,
+        daily_goals: ['Reinforce weak concepts', 'Practice missed areas'],
+        difficulty: Difficulty.EASY,
+        is_completed: false,
+        is_review: true,
+        review_of: currentSub.id,
+        weak_concepts: weakConcepts
+      };
 
-          updatedRoadmap = updatedRoadmap.map(m => {
-            if (m.id === currentSub.module_id || m.subtopics.some(s => s.id === currentSub.id)) {
-              const insertIdx = m.subtopics.findIndex(s => s.id === currentSub.id) + 1;
-              const newSubs = [...m.subtopics];
-              newSubs.splice(insertIdx, 0, reviewSubtopic);
-              return { ...m, subtopics: newSubs };
-            }
-            return m;
-          });
+      updatedRoadmap = updatedRoadmap.map(m => {
+        if (m.id === currentSub.module_id || m.subtopics.some(s => s.id === currentSub.id)) {
+          const insertIdx = m.subtopics.findIndex(s => s.id === currentSub.id) + 1;
+          const newSubs = [...m.subtopics];
+          newSubs.splice(insertIdx, 0, reviewSubtopic);
+          return { ...m, subtopics: newSubs };
         }
-        
-        const totalNodes = updatedRoadmap.reduce((acc, m) => acc + m.subtopics.filter(s => !s.is_review).length, 0);
-        const completedNodes = updatedRoadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0);
-        
-        const updatedAgent: LearningAgent = {
-          ...a,
-          roadmap: updatedRoadmap,
-          progress: Math.round((completedNodes / totalNodes) * 100),
-          total_focus_time: (a.total_focus_time || 0) + stats.focusTime,
-          total_distractions: (a.total_distractions || 0) + stats.distractions,
-          cognitive_history: [...(a.cognitive_history || []), { timestamp: new Date().toISOString(), state: stats.loadState }],
-          last_activity: new Date().toISOString()
-        };
-        firebaseService.saveAgent(updatedAgent);
-
-        // Log analytics event
-        firebaseService.saveAnalytics(updatedAgent.user_id, updatedAgent.id, 'session', {
-          subtopic_id: activeSession.subtopic.id,
-          subtopic_title: activeSession.subtopic.title,
-          focus_time: stats.focusTime,
-          distractions: stats.distractions,
-          cognitive_load: stats.loadState,
-          quiz_score: quizScore,
-          weak_concepts: weakConcepts,
-          progress: updatedAgent.progress
-        }).catch(() => {});
-
-        // Check if the module containing this subtopic is now fully complete
-        const completedModule = updatedRoadmap.find(m =>
-          m.subtopics.some(s => s.id === activeSession.subtopic.id)
-        );
-        if (completedModule) {
-          const coreSubtopics = completedModule.subtopics.filter(s => !s.is_review);
-          const allModuleDone = coreSubtopics.length > 0 && coreSubtopics.every(s => s.is_completed);
-          if (allModuleDone) {
-            const scores = coreSubtopics.map(s => s.quiz_score).filter((v): v is number => typeof v === 'number');
-            firebaseService.saveAnalytics(updatedAgent.user_id, updatedAgent.id, 'module_complete', {
-              module_id: completedModule.id,
-              module_title: completedModule.title,
-              total_subtopics: coreSubtopics.length,
-              avg_score: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
-              subtopics: coreSubtopics.map(s => ({
-                id: s.id,
-                title: s.title,
-                quiz_score: s.quiz_score ?? null,
-                weak_concepts: s.weak_concepts || [],
-                has_bundle: !!s.bundle,
-              })),
-              completed_at: new Date().toISOString(),
-              module_progress: `${updatedRoadmap.filter(m => {
-                const core = m.subtopics.filter(s => !s.is_review);
-                return core.length > 0 && core.every(s => s.is_completed);
-              }).length}/${updatedRoadmap.length}`,
-            }).catch(() => {});
-          }
-        }
-
-        return updatedAgent;
+        return m;
       });
-      return newAgents;
-    });
+    }
+
+    const totalNodes = updatedRoadmap.reduce((acc, m) => acc + m.subtopics.filter(s => !s.is_review).length, 0);
+    const completedNodes = updatedRoadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0);
+
+    const updatedAgent: LearningAgent = {
+      ...currentAgentSnapshot,
+      roadmap: updatedRoadmap,
+      progress: Math.round((completedNodes / totalNodes) * 100),
+      total_focus_time: (currentAgentSnapshot.total_focus_time || 0) + stats.focusTime,
+      total_distractions: (currentAgentSnapshot.total_distractions || 0) + stats.distractions,
+      cognitive_history: [...(currentAgentSnapshot.cognitive_history || []), { timestamp: new Date().toISOString(), state: stats.loadState }],
+      last_activity: new Date().toISOString()
+    };
+
+    // Update React state immediately
+    setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
     setActiveSession(null);
+
+    // Persist to database — AWAIT so it actually saves before user navigates away
+    try {
+      await firebaseService.saveAgent(updatedAgent);
+      console.info('[SAVE] Agent saved successfully:', updatedAgent.id, 'progress:', updatedAgent.progress + '%');
+    } catch (e) {
+      console.error('[SAVE] CRITICAL: Failed to save agent progress!', e);
+      // Retry once
+      try {
+        await firebaseService.saveAgent(updatedAgent);
+        console.info('[SAVE] Agent saved on retry:', updatedAgent.id);
+      } catch (e2) {
+        console.error('[SAVE] Retry also failed:', e2);
+      }
+    }
+
+    // Log analytics (non-critical, fire and forget with catch)
+    firebaseService.saveAnalytics(updatedAgent.user_id, updatedAgent.id, 'session', {
+      subtopic_id: activeSession.subtopic.id,
+      subtopic_title: activeSession.subtopic.title,
+      focus_time: stats.focusTime,
+      distractions: stats.distractions,
+      cognitive_load: stats.loadState,
+      quiz_score: quizScore,
+      weak_concepts: weakConcepts,
+      progress: updatedAgent.progress
+    }).catch(e => console.error('[ANALYTICS] session save failed:', e));
+
+    // Check if the module containing this subtopic is now fully complete
+    const completedModule = updatedRoadmap.find(m =>
+      m.subtopics.some(s => s.id === activeSession.subtopic.id)
+    );
+    if (completedModule) {
+      const coreSubtopics = completedModule.subtopics.filter(s => !s.is_review);
+      const allModuleDone = coreSubtopics.length > 0 && coreSubtopics.every(s => s.is_completed);
+      if (allModuleDone) {
+        const scores = coreSubtopics.map(s => s.quiz_score).filter((v): v is number => typeof v === 'number');
+        firebaseService.saveAnalytics(updatedAgent.user_id, updatedAgent.id, 'module_complete', {
+          module_id: completedModule.id,
+          module_title: completedModule.title,
+          total_subtopics: coreSubtopics.length,
+          avg_score: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+          subtopics: coreSubtopics.map(s => ({
+            id: s.id,
+            title: s.title,
+            quiz_score: s.quiz_score ?? null,
+            weak_concepts: s.weak_concepts || [],
+            has_bundle: !!s.bundle,
+          })),
+          completed_at: new Date().toISOString(),
+          module_progress: `${updatedRoadmap.filter(m => {
+            const core = m.subtopics.filter(s => !s.is_review);
+            return core.length > 0 && core.every(s => s.is_completed);
+          }).length}/${updatedRoadmap.length}`,
+        }).catch(e => console.error('[ANALYTICS] module_complete save failed:', e));
+      }
+    }
   };
 
   const handleFinalComplete = (result: { score: number, feedback: string, weak_areas: string[] }) => {
@@ -541,37 +556,31 @@ const App: React.FC = () => {
   };
 
   const handleUpdateAgentChat = (agentId: string, messages: ChatMessage[]) => {
-    setAgents(prev => {
-      const updated = prev.map(a => {
-        if (a.id === agentId) {
-          const updatedAgent = { ...a, chat_history: messages };
-          firebaseService.saveAgent(updatedAgent);
-          return updatedAgent;
-        }
-        return a;
-      });
-      return updated;
-    });
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    const updatedAgent = { ...agent, chat_history: messages };
+    setAgents(prev => prev.map(a => a.id === agentId ? updatedAgent : a));
+    firebaseService.saveAgent(updatedAgent).catch(e => console.error('[SAVE] chat update failed:', e));
   };
 
-  const handleMarkReviewRead = (agentId: string, subtopicId: string) => {
-    setAgents(prev => {
-      const newAgents = prev.map(a => {
-        if (a.id !== agentId) return a;
-        const updatedRoadmap = a.roadmap.map(m => ({
-          ...m,
-          subtopics: m.subtopics.map(s =>
-            s.id === subtopicId && s.is_review
-              ? { ...s, is_completed: true }
-              : s
-          )
-        }));
-        const updatedAgent = { ...a, roadmap: updatedRoadmap };
-        firebaseService.saveAgent(updatedAgent);
-        return updatedAgent;
-      });
-      return newAgents;
-    });
+  const handleMarkReviewRead = async (agentId: string, subtopicId: string) => {
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    const updatedRoadmap = agent.roadmap.map(m => ({
+      ...m,
+      subtopics: m.subtopics.map(s =>
+        s.id === subtopicId && s.is_review
+          ? { ...s, is_completed: true }
+          : s
+      )
+    }));
+    const updatedAgent = { ...agent, roadmap: updatedRoadmap };
+    setAgents(prev => prev.map(a => a.id === agentId ? updatedAgent : a));
+    try {
+      await firebaseService.saveAgent(updatedAgent);
+    } catch (e) {
+      console.error('[SAVE] Failed to save review mark-as-read:', e);
+    }
   };
 
   const handleDeleteAgent = async (agentId: string) => {
