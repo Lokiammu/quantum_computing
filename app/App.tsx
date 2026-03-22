@@ -416,8 +416,9 @@ const App: React.FC = () => {
           }
         }
 
-        // Inject a full review subtopic only for severe struggle (< 40%)
-        if (shouldInjectReview && weakConcepts.length > 0) {
+        // Inject a full review subtopic only for severe struggle (< 40%) — skip if one already exists
+        const existingReview = updatedRoadmap.some(m => m.subtopics.some(s => s.is_review && s.review_of === activeSession.subtopic.id));
+        if (shouldInjectReview && weakConcepts.length > 0 && !existingReview) {
           const currentSub = activeSession.subtopic;
           const reviewSubtopic: SubTopic = {
             id: `review_${currentSub.id}_${Date.now()}`,
@@ -550,6 +551,26 @@ const App: React.FC = () => {
         return a;
       });
       return updated;
+    });
+  };
+
+  const handleMarkReviewRead = (agentId: string, subtopicId: string) => {
+    setAgents(prev => {
+      const newAgents = prev.map(a => {
+        if (a.id !== agentId) return a;
+        const updatedRoadmap = a.roadmap.map(m => ({
+          ...m,
+          subtopics: m.subtopics.map(s =>
+            s.id === subtopicId && s.is_review
+              ? { ...s, is_completed: true }
+              : s
+          )
+        }));
+        const updatedAgent = { ...a, roadmap: updatedRoadmap };
+        firebaseService.saveAgent(updatedAgent);
+        return updatedAgent;
+      });
+      return newAgents;
     });
   };
 
@@ -1014,7 +1035,15 @@ const App: React.FC = () => {
                                             <Lock size={12} /> Locked
                                           </span>
                                         ) : sub.is_review ? (
-                                          <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review Session →</span>
+                                          <div className="flex items-center justify-between w-full">
+                                            <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review →</span>
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); handleMarkReviewRead(selectedAgentId!, sub.id); }}
+                                              className="text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-emerald-400 transition-colors px-3 py-1 rounded-lg hover:bg-emerald-500/10 border border-transparent hover:border-emerald-400/30"
+                                            >
+                                              Mark as Read
+                                            </button>
+                                          </div>
                                         ) : isToday ? (
                                           <span className="text-indigo-300 group-hover:text-white transition-colors">Start Today's Lesson →</span>
                                         ) : (

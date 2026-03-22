@@ -36,6 +36,7 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   const [quizFinished, setQuizFinished] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
 
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const regenCooldownRef = useRef<Record<string, number>>({});
   const quizWrongStreakRef = useRef(0);
@@ -239,6 +240,9 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   };
 
   const finalizeSession = async () => {
+    if (isFinalizing) return;
+    setIsFinalizing(true);
+
     const attempts = activeQuizSet.length || 1;
     const accuracy = quizScore / attempts;
     const errorRate = Math.max(0, Math.min(1, 1 - accuracy));
@@ -593,43 +597,59 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                      </div>
                    ) : (
                     <div className="space-y-10">
-                      <div className="p-12 border-2 border-slate-100 rounded-[3.5rem] bg-white shadow-2xl relative">
-                        <div className="absolute -top-6 left-12 px-6 py-2 bg-slate-900 text-white text-[10px] font-black uppercase rounded-full">
-                          Assessing: Question {currentQuizIndex + 1} of {activeQuizSet.length}
+                      <div className="p-8 md:p-12 border border-slate-200 rounded-[2.5rem] bg-white shadow-lg relative">
+                        <div className="absolute -top-4 left-8 px-5 py-1.5 bg-slate-900 text-white text-[10px] font-black uppercase rounded-full tracking-widest">
+                          Question {currentQuizIndex + 1} / {activeQuizSet.length}
                         </div>
-                        <p className="text-2xl font-black mb-12 tracking-tight leading-tight">{activeQuizSet[currentQuizIndex]?.question}</p>
-                        <div className="space-y-4">
-                           {activeQuizSet[currentQuizIndex]?.options.map((o, idx) => (
-                             <button 
-                               key={idx} 
-                               onClick={() => !showAnswer && setSelectedQuizOption(o)} 
-                               className={`w-full text-left p-6 md:p-8 rounded-[2rem] border-2 font-bold text-lg transition-all duration-300 relative overflow-hidden group ${
-                                 selectedQuizOption === o 
-                                   ? 'border-indigo-500 bg-indigo-50/80 shadow-[0_8px_30px_rgb(99,102,241,0.15)] text-indigo-900' 
-                                   : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 hover:shadow-md'
-                               }`}
-                             >
-                               {selectedQuizOption === o && (
-                                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none" />
-                               )}
-                               <span className="relative z-10 flex items-start gap-4">
-                                 <span className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-full text-sm mt-0.5 font-bold transition-colors ${
-                                   selectedQuizOption === o ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-700 group-hover:bg-slate-300 group-hover:text-slate-900'
-                                 }`}>{String.fromCharCode(65 + idx)}</span>
-                                 <span className="leading-relaxed">{o}</span>
-                               </span>
-                             </button>
-                         ))}
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-100 h-1 rounded-full mb-8 mt-2 overflow-hidden">
+                          <div className="h-full bg-slate-900 rounded-full transition-all duration-500" style={{ width: `${((currentQuizIndex + 1) / activeQuizSet.length) * 100}%` }} />
+                        </div>
+                        <p className="text-xl md:text-2xl font-black text-slate-900 mb-10 leading-snug">{activeQuizSet[currentQuizIndex]?.question}</p>
+                        <div className="space-y-3">
+                           {activeQuizSet[currentQuizIndex]?.options.map((o, idx) => {
+                             const isSelected = selectedQuizOption === o;
+                             const isCorrectAnswer = showAnswer && o === activeQuizSet[currentQuizIndex]?.answer;
+                             const isWrongSelected = showAnswer && isSelected && o !== activeQuizSet[currentQuizIndex]?.answer;
+                             return (
+                               <button
+                                 key={idx}
+                                 onClick={() => !showAnswer && setSelectedQuizOption(o)}
+                                 disabled={showAnswer}
+                                 className={`w-full text-left p-5 md:p-6 rounded-2xl border-2 font-semibold text-base transition-all duration-300 ${
+                                   isCorrectAnswer
+                                     ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
+                                     : isWrongSelected
+                                       ? 'border-rose-400 bg-rose-50 text-rose-900'
+                                       : isSelected
+                                         ? 'border-slate-900 bg-slate-50 text-slate-900 shadow-md'
+                                         : showAnswer
+                                           ? 'border-slate-100 bg-slate-50/50 text-slate-400'
+                                           : 'border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-400 text-slate-800'
+                                 }`}
+                               >
+                                 <span className="flex items-start gap-4">
+                                   <span className={`w-8 h-8 flex items-center justify-center shrink-0 rounded-full text-sm font-black transition-colors ${
+                                     isCorrectAnswer ? 'bg-emerald-500 text-white'
+                                     : isWrongSelected ? 'bg-rose-500 text-white'
+                                     : isSelected ? 'bg-slate-900 text-white'
+                                     : 'bg-slate-100 text-slate-600'
+                                   }`}>{String.fromCharCode(65 + idx)}</span>
+                                   <span className="leading-relaxed pt-0.5">{o}</span>
+                                 </span>
+                               </button>
+                             );
+                           })}
                         </div>
                       </div>
                       {selectedQuizOption && !showAnswer && (
-                        <button onClick={() => setShowAnswer(true)} className="w-full py-7 bg-indigo-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-xl">Verify Selection</button>
+                        <button onClick={() => setShowAnswer(true)} className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 active:scale-[0.98] transition-all">Verify Selection</button>
                       )}
                       {showAnswer && (
-                        <div className="space-y-8 animate-in slide-in-from-bottom-8">
-                          <div className={`p-10 rounded-[3rem] border-2 shadow-sm ${selectedQuizOption === activeQuizSet[currentQuizIndex]?.answer ? 'bg-emerald-50 border-emerald-100 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'}`}>
-                            <p className="font-black text-xl mb-3">{selectedQuizOption === activeQuizSet[currentQuizIndex]?.answer ? '✓ Positive match' : '✗ Incorrect branch'}</p>
-                            <p className="text-base font-bold opacity-80 leading-relaxed">{activeQuizSet[currentQuizIndex]?.explanation || ''}</p>
+                        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
+                          <div className={`p-8 rounded-2xl border ${selectedQuizOption === activeQuizSet[currentQuizIndex]?.answer ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                            <p className="font-black text-lg mb-2">{selectedQuizOption === activeQuizSet[currentQuizIndex]?.answer ? 'Correct' : 'Incorrect'}</p>
+                            <p className="text-sm font-medium leading-relaxed opacity-80">{activeQuizSet[currentQuizIndex]?.explanation || ''}</p>
                           </div>
                           <button onClick={() => {
                             const currentQ = activeQuizSet[currentQuizIndex];
@@ -637,14 +657,12 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                             const isCorrect = selectedQuizOption === currentQ.answer;
                             if (isCorrect) setQuizScore(s => s + 1);
 
-                            // Track wrong answers for revision injection
                             if (!isCorrect) {
                               quizWrongAnswersRef.current.push(
                                 `Q: ${currentQ.question} | Correct: ${currentQ.answer} | Explanation: ${currentQ.explanation || 'N/A'}`
                               );
                             }
 
-                            // Always move forward — don't trap user on wrong answer
                             if (currentQuizIndex < activeQuizSet.length - 1) {
                               setCurrentQuizIndex(i => i + 1);
                               setSelectedQuizOption(null);
@@ -653,7 +671,9 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                             } else {
                               setQuizFinished(true);
                             }
-                          }} className="w-full py-7 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest">Next Branch</button>
+                          }} className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 active:scale-[0.98] transition-all">
+                            {currentQuizIndex < activeQuizSet.length - 1 ? 'Next Question' : 'View Results'}
+                          </button>
                         </div>
                       )}
                     </div>
@@ -663,11 +683,21 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                  <div className="text-center space-y-12 animate-in zoom-in-95 duration-500">
                     <div className="w-32 h-32 bg-indigo-50 rounded-[2.5rem] flex items-center justify-center mx-auto text-6xl shadow-inner">🏆</div>
                     <div>
-                      <h2 className="text-5xl font-black tracking-tighter">Session Optimized</h2>
+                      <h2 className="text-5xl font-black tracking-tighter text-slate-900">Session Optimized</h2>
                       <p className="text-slate-500 font-bold mt-4 text-xl">Verification Accuracy: {Math.round((quizScore / (activeQuizSet.length || 1)) * 100)}%</p>
                       <p className="text-slate-400 text-xs mt-2 uppercase font-black tracking-widest">{quizScore} correct out of {activeQuizSet.length}</p>
                     </div>
-                    <button onClick={finalizeSession} className="w-full py-7 bg-indigo-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl">Finalize Mastery</button>
+                    <button
+                      onClick={finalizeSession}
+                      disabled={isFinalizing}
+                      className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl transition-all ${
+                        isFinalizing
+                          ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                          : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95'
+                      }`}
+                    >
+                      {isFinalizing ? 'Finalizing...' : 'Finalize Mastery'}
+                    </button>
                  </div>
                ) : null}
             </div>
