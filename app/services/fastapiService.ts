@@ -42,14 +42,27 @@ export const fastapiService = {
     const data = await parseJson<{ ok: boolean; roadmap: any[] }>(res);
     if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to generate roadmap');
 
-    const roadmap = (Array.isArray(data.roadmap) ? data.roadmap : []).map((m: any) => ({
-      ...m,
-      subtopics: Array.isArray(m?.subtopics)
-        ? m.subtopics
-          .map((s: any) => ({ ...s, is_completed: false, is_synthesized: false }))
-          .sort((a: any, b: any) => (a?.day_number || 0) - (b?.day_number || 0))
-        : []
-    }));
+    const seenIds = new Set<string>();
+    const roadmap = (Array.isArray(data.roadmap) ? data.roadmap : []).map((m: any) => {
+      // Ensure module has a unique ID
+      const moduleId = m?.id || Math.random().toString(36).substr(2, 9);
+      return {
+        ...m,
+        id: moduleId,
+        subtopics: Array.isArray(m?.subtopics)
+          ? m.subtopics
+            .map((s: any) => {
+              // Make subtopic IDs globally unique by prefixing with module ID
+              let subId = `${moduleId}_${s?.id || Math.random().toString(36).substr(2, 6)}`;
+              // Handle collisions even within same module
+              while (seenIds.has(subId)) subId += '_' + Math.random().toString(36).substr(2, 4);
+              seenIds.add(subId);
+              return { ...s, id: subId, module_id: moduleId, is_completed: false, is_synthesized: false };
+            })
+            .sort((a: any, b: any) => (a?.day_number || 0) - (b?.day_number || 0))
+          : []
+      };
+    });
     // Fix: Added missing cognitive_history property to match LearningAgent interface
     return {
       id: Math.random().toString(36).substr(2, 9),

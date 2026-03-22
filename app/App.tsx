@@ -12,7 +12,7 @@ import Profile from './components/Profile';
 import FinalAssessmentView from './components/FinalAssessmentView';
 import AbstractBackground from './components/AbstractBackground';
 import Navbar from './components/Navbar';
-import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon } from 'lucide-react';
+import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon, Lock, CheckCircle2, Trash2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<'home' | 'planner' | 'stats' | 'me'>('home');
@@ -89,9 +89,58 @@ const App: React.FC = () => {
   const [dailyHours, setDailyHours] = useState(2);
   const [referenceTextbook, setReferenceTextbook] = useState('');
 
+  // Recalculate progress from roadmap to prevent stale stored values
+  const recalculateProgress = (agent: LearningAgent): number => {
+    const totalNodes = agent.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => !s.is_review).length, 0);
+    const completedNodes = agent.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0);
+    return totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
+  };
+
+  // Fix duplicate subtopic IDs in existing data (legacy agents before unique ID fix)
+  const deduplicateSubtopicIds = (agent: LearningAgent): LearningAgent => {
+    const seenIds = new Set<string>();
+    let changed = false;
+    const fixedRoadmap = agent.roadmap.map(m => ({
+      ...m,
+      subtopics: m.subtopics.map(s => {
+        // Ensure module_id is set
+        const needsModuleId = !s.module_id || s.module_id !== m.id;
+        // Check for duplicate ID across modules
+        if (seenIds.has(s.id)) {
+          changed = true;
+          const newId = `${m.id}_${s.id}_${Math.random().toString(36).substr(2, 4)}`;
+          seenIds.add(newId);
+          return { ...s, id: newId, module_id: m.id, is_completed: false };
+        }
+        seenIds.add(s.id);
+        if (needsModuleId) {
+          changed = true;
+          return { ...s, module_id: m.id };
+        }
+        return s;
+      })
+    }));
+    if (changed) return { ...agent, roadmap: fixedRoadmap };
+    return agent;
+  };
+
   useEffect(() => {
     if (currentUser) {
-      firebaseService.getAgents(currentUser.uid).then(setAgents).catch(() => {});
+      firebaseService.getAgents(currentUser.uid).then(loaded => {
+        const corrected = loaded.map(a => {
+          // Fix duplicate subtopic IDs from legacy data
+          let fixed = deduplicateSubtopicIds(a);
+          // Always recalculate progress from actual roadmap data
+          const correctProgress = recalculateProgress(fixed);
+          if (fixed.progress !== correctProgress || fixed !== a) {
+            fixed = { ...fixed, progress: correctProgress };
+            firebaseService.saveAgent(fixed); // persist corrections
+            return fixed;
+          }
+          return fixed;
+        });
+        setAgents(corrected);
+      }).catch(() => {});
       firebaseService.getTasks(currentUser.uid).then(setTasks).catch(() => {});
       firebaseService.getSchedule(currentUser.uid).then(setSchedule).catch(() => {});
     }
@@ -329,12 +378,18 @@ const App: React.FC = () => {
       const newAgents = prev.map(a => {
         if (a.id !== activeSession.agentId) return a;
         
+        // Match subtopic by BOTH id and module_id to prevent cross-module collisions
+        const targetSubId = activeSession.subtopic.id;
+        const targetModId = activeSession.subtopic.module_id;
         let updatedRoadmap: Module[] = a.roadmap.map(m => ({
           ...m,
-          subtopics: m.subtopics.map(s => s.id === activeSession.subtopic.id 
-            ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined } 
-            : s
-          )
+          subtopics: m.subtopics.map(s => {
+            const idMatch = s.id === targetSubId;
+            const modMatch = !targetModId || m.id === targetModId || s.module_id === targetModId;
+            return (idMatch && modMatch)
+              ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined }
+              : s;
+          })
         }));
 
         // Find the next subtopic and prepend revision content to its notes
@@ -414,6 +469,36 @@ const App: React.FC = () => {
           progress: updatedAgent.progress
         }).catch(() => {});
 
+        // Check if the module containing this subtopic is now fully complete
+        const completedModule = updatedRoadmap.find(m =>
+          m.subtopics.some(s => s.id === activeSession.subtopic.id)
+        );
+        if (completedModule) {
+          const coreSubtopics = completedModule.subtopics.filter(s => !s.is_review);
+          const allModuleDone = coreSubtopics.length > 0 && coreSubtopics.every(s => s.is_completed);
+          if (allModuleDone) {
+            const scores = coreSubtopics.map(s => s.quiz_score).filter((v): v is number => typeof v === 'number');
+            firebaseService.saveAnalytics(updatedAgent.user_id, updatedAgent.id, 'module_complete', {
+              module_id: completedModule.id,
+              module_title: completedModule.title,
+              total_subtopics: coreSubtopics.length,
+              avg_score: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+              subtopics: coreSubtopics.map(s => ({
+                id: s.id,
+                title: s.title,
+                quiz_score: s.quiz_score ?? null,
+                weak_concepts: s.weak_concepts || [],
+                has_bundle: !!s.bundle,
+              })),
+              completed_at: new Date().toISOString(),
+              module_progress: `${updatedRoadmap.filter(m => {
+                const core = m.subtopics.filter(s => !s.is_review);
+                return core.length > 0 && core.every(s => s.is_completed);
+              }).length}/${updatedRoadmap.length}`,
+            }).catch(() => {});
+          }
+        }
+
         return updatedAgent;
       });
       return newAgents;
@@ -466,6 +551,22 @@ const App: React.FC = () => {
       });
       return updated;
     });
+  };
+
+  const handleDeleteAgent = async (agentId: string) => {
+    if (!currentUser) return;
+    if (!confirm('Delete this subject and all its progress? This cannot be undone.')) return;
+    try {
+      await firebaseService.deleteAgent(agentId);
+      setAgents(prev => prev.filter(a => a.id !== agentId));
+      // Remove schedule events for this agent
+      const updatedSchedule = schedule.filter(e => e.agent_id !== agentId);
+      setSchedule(updatedSchedule);
+      firebaseService.saveSchedule(currentUser.uid, updatedSchedule);
+      if (selectedAgentId === agentId) setSelectedAgentId(null);
+    } catch (err) {
+      alert('Failed to delete subject.');
+    }
   };
 
   const handleStartSessionFromPlanner = (agentId: string, subtopicId: string) => {
@@ -715,7 +816,15 @@ const App: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {agents.map(agent => (
-                    <div key={agent.id} onClick={() => setSelectedAgentId(agent.id)} className="group figma-glass p-8 transition-all cursor-pointer hover:-translate-y-1">
+                    <div key={agent.id} onClick={() => setSelectedAgentId(agent.id)} className="group figma-glass p-8 transition-all cursor-pointer hover:-translate-y-1 relative">
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent.id); }}
+                        className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-white/0 hover:bg-rose-500/20 flex items-center justify-center text-white/20 hover:text-rose-300 transition-all opacity-0 group-hover:opacity-100 border border-transparent hover:border-rose-400/30"
+                        title="Delete subject"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                       <div className="flex justify-between items-center mb-10 text-white">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center font-black text-2xl group-hover:bg-white group-hover:text-[#0d62bb] transition-all">
                            {agent.subject[0]}
@@ -767,76 +876,159 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-14">
-                   {currentAgent?.roadmap.map((mod) => (
-                     <div key={mod.id} className="space-y-6">
-                        <h4 className="font-black text-xl text-white border-l-4 border-indigo-400 pl-5">{mod.title}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                           {mod.subtopics.map(sub => (
-                             <div
-                               key={sub.id}
-                               onClick={() => setActiveSession({ agentId: selectedAgentId!, subtopic: sub })}
-                               className={`group relative p-6 rounded-[2rem] border cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
-                                 sub.is_review
-                                   ? 'figma-glass border-amber-400/30 hover:border-amber-400/60'
-                                   : sub.is_completed
-                                     ? 'figma-glass border-emerald-400/30 hover:border-emerald-400/60'
-                                     : 'figma-glass border-white/20 hover:border-indigo-400/50'
-                               }`}
-                             >
-                                {/* Subtle hover glow */}
-                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
-                                  sub.is_review ? 'bg-gradient-to-br from-amber-500/10 to-transparent'
-                                  : sub.is_completed ? 'bg-gradient-to-br from-emerald-500/10 to-transparent'
-                                  : 'bg-gradient-to-br from-indigo-500/10 to-transparent'
-                                }`} />
+                   {(() => {
+                     // Determine the current active day: smallest day_number among uncompleted non-review subtopics
+                     const allSubs = currentAgent?.roadmap.flatMap(m => m.subtopics) || [];
+                     const uncompletedDays = allSubs.filter(s => !s.is_completed && !s.is_review).map(s => s.day_number);
+                     const currentDay = uncompletedDays.length > 0 ? Math.min(...uncompletedDays) : Infinity;
+                     // Assign a global sequential index to each unique day_number for display
+                     const uniqueDays = [...new Set(allSubs.filter(s => !s.is_review).map(s => s.day_number))].sort((a, b) => a - b);
+                     const dayLabel = (d: number) => {
+                       const idx = uniqueDays.indexOf(d);
+                       return idx >= 0 ? idx + 1 : d;
+                     };
 
-                                <div className="relative z-10">
-                                  <div className="flex justify-between items-center mb-5">
-                                    <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg ${
-                                      sub.is_review
-                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
-                                        : sub.is_completed
-                                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                          : 'bg-white/10 text-white/80 border border-white/20'
-                                    }`}>
-                                      {sub.is_review ? 'Review' : `Day ${sub.day_number}`}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                      {typeof sub.quiz_score === 'number' && (
-                                        <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
-                                          sub.quiz_score >= 70
-                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                            : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
-                                        }`}>{sub.quiz_score}%</span>
-                                      )}
-                                      <span className="text-[9px] font-bold text-white/40 uppercase">{sub.difficulty}</span>
-                                    </div>
+                     return currentAgent?.roadmap.map((mod) => {
+                       const coreSubs = mod.subtopics.filter(s => !s.is_review);
+                       const modCompleted = coreSubs.filter(s => s.is_completed).length;
+                       const modTotal = coreSubs.length;
+                       const modPct = modTotal > 0 ? Math.round((modCompleted / modTotal) * 100) : 0;
+                       const isModuleDone = modPct === 100;
+
+                       return (
+                         <div key={mod.id} className="space-y-6">
+                            {/* Module header with progress */}
+                            <div className="flex items-center gap-4">
+                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black border ${
+                                isModuleDone
+                                  ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'
+                                  : 'bg-white/10 border-white/20 text-white/70'
+                              }`}>
+                                {isModuleDone ? <CheckCircle2 size={20} /> : (currentAgent!.roadmap.indexOf(mod) + 1)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-black text-xl text-white truncate">{mod.title}</h4>
+                                <div className="flex items-center gap-3 mt-1.5">
+                                  <div className="flex-1 max-w-[200px] bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all duration-700" style={{
+                                      width: `${modPct}%`,
+                                      background: isModuleDone ? 'linear-gradient(90deg, #34d399, #6ee7b7)' : 'linear-gradient(90deg, #818cf8, #a78bfa)'
+                                    }} />
                                   </div>
-                                  <h5 className="font-black text-lg text-white group-hover:text-white leading-snug">{sub.title}</h5>
-                                  {sub.is_review && sub.weak_concepts && sub.weak_concepts.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-3">
-                                      {sub.weak_concepts.slice(0, 3).map((c, i) => (
-                                        <span key={i} className="text-[9px] font-bold bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">{c.length > 30 ? c.slice(0, 30) + '...' : c}</span>
-                                      ))}
-                                    </div>
-                                  )}
+                                  <span className="text-[10px] font-black text-white/40">{modCompleted}/{modTotal}</span>
                                 </div>
-                                <div className="relative z-10 mt-6 pt-4 border-t border-white/10 text-[10px] font-black uppercase tracking-widest">
-                                  {sub.is_completed ? (
-                                    <span className="text-emerald-400 flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Completed
-                                    </span>
-                                  ) : sub.is_review ? (
-                                    <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review Session →</span>
-                                  ) : (
-                                    <span className="text-indigo-300 group-hover:text-white transition-colors">Start Adaptive Lesson →</span>
-                                  )}
-                                </div>
-                             </div>
-                           ))}
-                        </div>
-                     </div>
-                   ))}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                               {mod.subtopics.map(sub => {
+                                 const isToday = !sub.is_completed && !sub.is_review && sub.day_number === currentDay;
+                                 const isLocked = !sub.is_completed && !sub.is_review && sub.day_number > currentDay;
+                                 const isAccessible = sub.is_completed || sub.is_review || sub.day_number <= currentDay;
+
+                                 return (
+                                   <div
+                                     key={sub.id}
+                                     onClick={() => { if (isAccessible) setActiveSession({ agentId: selectedAgentId!, subtopic: sub }); }}
+                                     className={`group relative p-6 rounded-[2rem] border transition-all duration-300 overflow-hidden ${
+                                       isLocked
+                                         ? 'bg-white/[0.03] border-white/[0.08] cursor-not-allowed'
+                                         : sub.is_review
+                                           ? 'figma-glass border-amber-400/30 hover:border-amber-400/60 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                           : sub.is_completed
+                                             ? 'figma-glass border-emerald-400/30 hover:border-emerald-400/60 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                             : isToday
+                                               ? 'figma-glass border-indigo-400/50 cursor-pointer hover:-translate-y-1 hover:shadow-xl shadow-lg shadow-indigo-500/10'
+                                               : 'figma-glass border-white/20 hover:border-indigo-400/50 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                     }`}
+                                   >
+                                      {/* Today pulse ring */}
+                                      {isToday && (
+                                        <div className="absolute -top-1 -right-1 w-3 h-3">
+                                          <span className="absolute inset-0 rounded-full bg-indigo-400 animate-ping opacity-75" />
+                                          <span className="absolute inset-0 rounded-full bg-indigo-400" />
+                                        </div>
+                                      )}
+
+                                      {/* Hover glow */}
+                                      {!isLocked && (
+                                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
+                                          sub.is_review ? 'bg-gradient-to-br from-amber-500/10 to-transparent'
+                                          : sub.is_completed ? 'bg-gradient-to-br from-emerald-500/10 to-transparent'
+                                          : 'bg-gradient-to-br from-indigo-500/10 to-transparent'
+                                        }`} />
+                                      )}
+
+                                      <div className={`relative z-10 ${isLocked ? 'opacity-40' : ''}`}>
+                                        <div className="flex justify-between items-center mb-5">
+                                          <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg ${
+                                              sub.is_review
+                                                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                                : sub.is_completed
+                                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                                  : isToday
+                                                    ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/40'
+                                                    : isLocked
+                                                      ? 'bg-white/5 text-white/30 border border-white/10'
+                                                      : 'bg-white/10 text-white/80 border border-white/20'
+                                            }`}>
+                                              {sub.is_review ? 'Review' : `Day ${dayLabel(sub.day_number)}`}
+                                            </span>
+                                            {isToday && (
+                                              <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 uppercase tracking-widest">
+                                                Today
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {typeof sub.quiz_score === 'number' && (
+                                              <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
+                                                sub.quiz_score >= 70
+                                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                                  : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                                              }`}>{sub.quiz_score}%</span>
+                                            )}
+                                            {isLocked
+                                              ? <Lock size={14} className="text-white/20" />
+                                              : <span className="text-[9px] font-bold text-white/40 uppercase">{sub.difficulty}</span>
+                                            }
+                                          </div>
+                                        </div>
+                                        <h5 className={`font-black text-lg leading-snug ${isLocked ? 'text-white/30' : 'text-white'}`}>{sub.title}</h5>
+                                        {sub.is_review && sub.weak_concepts && sub.weak_concepts.length > 0 && (
+                                          <div className="flex flex-wrap gap-1.5 mt-3">
+                                            {sub.weak_concepts.slice(0, 3).map((c, i) => (
+                                              <span key={i} className="text-[9px] font-bold bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">{c.length > 30 ? c.slice(0, 30) + '...' : c}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className={`relative z-10 mt-6 pt-4 border-t text-[10px] font-black uppercase tracking-widest ${isLocked ? 'border-white/5' : 'border-white/10'}`}>
+                                        {sub.is_completed ? (
+                                          <span className="text-emerald-400 flex items-center gap-1.5">
+                                            <CheckCircle2 size={12} /> Completed
+                                          </span>
+                                        ) : isLocked ? (
+                                          <span className="text-white/20 flex items-center gap-1.5">
+                                            <Lock size={12} /> Locked
+                                          </span>
+                                        ) : sub.is_review ? (
+                                          <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review Session →</span>
+                                        ) : isToday ? (
+                                          <span className="text-indigo-300 group-hover:text-white transition-colors">Start Today's Lesson →</span>
+                                        ) : (
+                                          <span className="text-indigo-300 group-hover:text-white transition-colors">Start Adaptive Lesson →</span>
+                                        )}
+                                      </div>
+                                   </div>
+                                 );
+                               })}
+                            </div>
+                         </div>
+                       );
+                     });
+                   })()}
 
                    {/* Final Assessment Section */}
                    <div className="pt-16 border-t border-white/10 text-center space-y-8">
@@ -880,7 +1072,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeScreen === 'planner' && <Planner tasks={tasks} schedule={schedule} agents={agents} onStartSession={handleStartSessionFromPlanner} />}
+        {activeScreen === 'planner' && <Planner tasks={tasks} schedule={schedule} agents={agents} onStartSession={handleStartSessionFromPlanner} onUpdateSchedule={(updated) => { setSchedule(updated); if (currentUser) firebaseService.saveSchedule(currentUser.uid, updated); }} />}
         {activeScreen === 'stats' && <Dashboard agents={agents} />}
         {activeScreen === 'me' && (
           <Profile

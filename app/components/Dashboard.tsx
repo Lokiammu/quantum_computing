@@ -69,11 +69,12 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
           totalLessons++;
           if (s.is_completed) {
             completedLessons++;
-            const score = s.quiz_score ?? 0;
-            quizScores.push(score);
-            if (score >= 70) mastered++;
-            else if (score >= 40) neutral++;
-            else struggle++;
+            if (typeof s.quiz_score === 'number') {
+              quizScores.push(s.quiz_score);
+              if (s.quiz_score >= 70) mastered++;
+              else if (s.quiz_score >= 40) neutral++;
+              else struggle++;
+            }
           }
         }
       }
@@ -112,12 +113,14 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
           if (s.is_completed) {
             mCompleted++;
             completed++;
-            const score = s.quiz_score ?? 0;
-            scores.push(score);
-            mScores.push(score);
-            if (score >= 70) mastered++;
-            else if (score >= 40) neutral++;
-            else struggle++;
+            if (typeof s.quiz_score === 'number') {
+              const score = s.quiz_score;
+              scores.push(score);
+              mScores.push(score);
+              if (score >= 70) mastered++;
+              else if (score >= 40) neutral++;
+              else struggle++;
+            }
           }
         }
         moduleStats.push({

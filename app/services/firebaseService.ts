@@ -53,6 +53,10 @@ export const firebaseService = {
     await post("/api/data/agent", { agent });
   },
 
+  async deleteAgent(agentId: string): Promise<void> {
+    await api(`/api/data/agent/${agentId}`, { method: "DELETE" });
+  },
+
   async getAgents(uid: string): Promise<LearningAgent[]> {
     const res = await api<{ ok: boolean; agents: LearningAgent[] }>(`/api/data/agents?uid=${uid}`);
     return res.agents;

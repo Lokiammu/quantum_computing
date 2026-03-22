@@ -1,19 +1,39 @@
 
 import React, { useState, useMemo } from 'react';
 import { Task, ScheduleEvent, LearningAgent } from '../types';
+import { Clock, Settings2 } from 'lucide-react';
 
 interface PlannerProps {
   tasks: Task[];
   schedule: ScheduleEvent[];
   agents: LearningAgent[];
   onStartSession: (agentId: string, subtopicId: string) => void;
+  onUpdateSchedule: (updated: ScheduleEvent[]) => void;
 }
 
-const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSession }) => {
+const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSession, onUpdateSchedule }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
+  });
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [studyHour, setStudyHour] = useState(() => {
+    // Derive default from first study event or default 10 AM
+    const first = schedule.find(e => e.type === 'study');
+    return first ? new Date(first.start_time).getHours() : 10;
+  });
+  const [studyMinute, setStudyMinute] = useState(() => {
+    const first = schedule.find(e => e.type === 'study');
+    return first ? new Date(first.start_time).getMinutes() : 0;
+  });
+  const [sessionDuration, setSessionDuration] = useState(() => {
+    const first = schedule.find(e => e.type === 'study');
+    if (first) {
+      const diff = (new Date(first.end_time).getTime() - new Date(first.start_time).getTime()) / 60000;
+      return Math.round(diff) || 120;
+    }
+    return 120;
   });
 
   // Generate 14 days for the horizontal picker
@@ -44,7 +64,7 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
     const today = new Date();
     today.setHours(0,0,0,0);
     if (date.getTime() === today.getTime()) return "Today";
-    
+
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
     if (date.getTime() === tomorrow.getTime()) return "Tomorrow";
@@ -52,21 +72,129 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
     return date.toLocaleDateString('en-US', { weekday: 'short' });
   };
 
+  const formatTime = (h: number, m: number) => {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hr = h % 12 || 12;
+    return `${hr}:${m.toString().padStart(2, '0')} ${period}`;
+  };
+
+  const applyScheduleChange = () => {
+    const updated = schedule.map(e => {
+      if (e.type !== 'study') return e;
+      const old = new Date(e.start_time);
+      const newStart = new Date(old);
+      newStart.setHours(studyHour, studyMinute, 0, 0);
+      const newEnd = new Date(newStart.getTime() + sessionDuration * 60000);
+      return { ...e, start_time: newStart.toISOString(), end_time: newEnd.toISOString() };
+    });
+    onUpdateSchedule(updated);
+    setShowScheduler(false);
+  };
+
+  const dayEventCount = (date: Date) => {
+    const start = new Date(date); start.setHours(0,0,0,0);
+    const end = new Date(date); end.setHours(23,59,59,999);
+    return schedule.filter(e => { const d = new Date(e.start_time); return d >= start && d <= end; }).length;
+  };
+
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-500">
-      {/* Horizontal Date Picker */}
+      {/* Header with scheduler toggle */}
       <div className="sticky top-0 z-10 figma-glass mx-6 mt-6 rounded-[2rem] px-6 py-6 mb-4 shadow-sm border-white/20">
-        <h2 className="text-3xl font-black tracking-tighter mb-6 text-white px-2">Daily Schedule</h2>
+        <div className="flex items-center justify-between mb-6 px-2">
+          <h2 className="text-3xl font-black tracking-tighter text-white">Daily Schedule</h2>
+          <button
+            onClick={() => setShowScheduler(!showScheduler)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+              showScheduler
+                ? 'bg-white text-[#0d62bb] border-transparent shadow-lg'
+                : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20 hover:text-white'
+            }`}
+          >
+            <Settings2 size={14} />
+            {showScheduler ? 'Close' : 'Settings'}
+          </button>
+        </div>
+
+        {/* Scheduler Settings Panel */}
+        {showScheduler && (
+          <div className="mb-6 px-2 animate-in slide-in-from-top-2 duration-300">
+            <div className="figma-glass-blue p-6 rounded-2xl space-y-5">
+              <div className="flex items-center gap-2 mb-1">
+                <Clock size={16} className="text-indigo-300" />
+                <h3 className="text-sm font-black text-white">Study Schedule Settings</h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Start Time */}
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2 block">Start Time</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={studyHour}
+                      onChange={e => setStudyHour(Number(e.target.value))}
+                      className="flex-1 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i} className="bg-slate-900">{(i % 12 || 12).toString().padStart(2, '0')} {i >= 12 ? 'PM' : 'AM'}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={studyMinute}
+                      onChange={e => setStudyMinute(Number(e.target.value))}
+                      className="w-20 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
+                    >
+                      {[0, 15, 30, 45].map(m => (
+                        <option key={m} value={m} className="bg-slate-900">{m.toString().padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2 block">Session Duration</label>
+                  <select
+                    value={sessionDuration}
+                    onChange={e => setSessionDuration(Number(e.target.value))}
+                    className="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
+                  >
+                    {[30, 45, 60, 90, 120, 150, 180].map(d => (
+                      <option key={d} value={d} className="bg-slate-900">{d >= 60 ? `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}m` : ''}` : `${d}m`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Apply */}
+                <div className="flex items-end">
+                  <button
+                    onClick={applyScheduleChange}
+                    className="w-full p-3 bg-white text-[#0d62bb] rounded-xl font-black text-sm shadow-lg hover:bg-slate-50 transition-all active:scale-95"
+                  >
+                    Apply to All
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-white/30 font-medium">
+                Currently: {formatTime(studyHour, studyMinute)} daily · {sessionDuration >= 60 ? `${Math.floor(sessionDuration / 60)}h${sessionDuration % 60 ? ` ${sessionDuration % 60}m` : ''}` : `${sessionDuration}m`} per session
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Date Picker */}
         <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth px-2">
           {dates.map((date, idx) => {
             const isSelected = date.getTime() === selectedDate.getTime();
+            const count = dayEventCount(date);
             return (
               <button
                 key={idx}
                 onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center min-w-[75px] py-4 rounded-3xl transition-all duration-300 border ${
-                  isSelected 
-                  ? 'bg-white text-[#0d62bb] border-transparent shadow-lg shadow-black/20 -translate-y-1' 
+                className={`flex flex-col items-center min-w-[75px] py-4 rounded-3xl transition-all duration-300 border relative ${
+                  isSelected
+                  ? 'bg-white text-[#0d62bb] border-transparent shadow-lg shadow-black/20 -translate-y-1'
                   : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30 hover:text-white/80 hover:-translate-y-1'
                 }`}
               >
@@ -74,6 +202,13 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
                   {formatDateLabel(date)}
                 </span>
                 <span className="text-2xl font-black">{date.getDate()}</span>
+                {count > 0 && (
+                  <div className={`mt-1 flex gap-0.5 ${isSelected ? '' : ''}`}>
+                    {Array.from({ length: Math.min(count, 4) }, (_, i) => (
+                      <span key={i} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[#0d62bb]/40' : 'bg-white/30'}`} />
+                    ))}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -95,22 +230,35 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
             {selectedDayEvents.map((event, idx) => {
               const isStudy = event.type === 'study';
               const agent = isStudy ? agents.find(a => a.id === event.agent_id) : null;
-              
+              const subtopic = agent ? agent.roadmap.flatMap(m => m.subtopics).find(s => s.id === event.subtopic_id) : null;
+              const isCompleted = subtopic?.is_completed ?? false;
+              const startTime = new Date(event.start_time);
+              const endTime = new Date(event.end_time);
+              const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+
               return (
                 <div key={event.id} className="relative pl-14 group animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
                   {/* Timeline Dot */}
                   <div className={`absolute left-0 top-6 w-9 h-9 rounded-full border-4 border-[#0d62bb] shadow-md z-10 transition-transform group-hover:scale-125 ${
-                    isStudy ? 'bg-white' : 'bg-rose-400'
+                    isCompleted ? 'bg-emerald-400' : isStudy ? 'bg-white' : 'bg-rose-400'
                   }`} />
-                  
+
                   <div className="flex flex-col gap-2">
-                    <span className="text-[11px] font-black text-white/50 uppercase tracking-widest pl-1">
-                      {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    
+                    <div className="flex items-center gap-3 pl-1">
+                      <span className="text-[11px] font-black text-white/50 uppercase tracking-widest">
+                        {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className="text-[10px] text-white/20">—</span>
+                      <span className="text-[11px] font-black text-white/30 uppercase tracking-widest">
+                        {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
                     <div className={`p-8 rounded-[2.5rem] border transition-all duration-300 ${
-                      isStudy 
-                      ? 'figma-glass hover:border-white/50 hover:shadow-xl hover:-translate-y-1' 
+                      isCompleted
+                      ? 'figma-glass border-emerald-400/30'
+                      : isStudy
+                      ? 'figma-glass hover:border-white/50 hover:shadow-xl hover:-translate-y-1'
                       : 'bg-rose-500/20 backdrop-blur-md border-rose-300/30 shadow-sm hover:shadow-md'
                     }`}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -124,27 +272,41 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
                             {event.title.split(': ').length > 1 ? event.title.split(': ')[1] : event.title}
                           </h4>
                         </div>
-                        
+
                         {isStudy && event.agent_id && event.subtopic_id && (
-                          <button 
-                            onClick={() => onStartSession(event.agent_id!, event.subtopic_id!)}
-                            className="shrink-0 px-6 py-3 bg-white text-[#0d62bb] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg hover:shadow-white/20 active:scale-95"
-                          >
-                            Launch Lesson
-                          </button>
+                          isCompleted ? (
+                            <span className="shrink-0 px-6 py-3 bg-emerald-500/20 text-emerald-300 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-400/30">
+                              Completed
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => onStartSession(event.agent_id!, event.subtopic_id!)}
+                              className="shrink-0 px-6 py-3 bg-white text-[#0d62bb] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg hover:shadow-white/20 active:scale-95"
+                            >
+                              Launch Lesson
+                            </button>
+                          )
                         )}
                       </div>
-                      
+
                       <div className="mt-6 flex items-center gap-3">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                          isStudy ? 'bg-white/20 text-white' : 'bg-rose-500/30 text-rose-100 border border-rose-400/20'
+                          isCompleted ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/20'
+                          : isStudy ? 'bg-white/20 text-white' : 'bg-rose-500/30 text-rose-100 border border-rose-400/20'
                         }`}>
-                          {event.type}
+                          {isCompleted ? 'done' : event.type}
                         </span>
                         <span className="text-xs font-bold text-white/50 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-white/30"></span>
-                          Duration: 120m
+                          {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}m` : ''}` : `${durationMin}m`}
                         </span>
+                        {typeof subtopic?.quiz_score === 'number' && (
+                          <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
+                            subtopic.quiz_score >= 70
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                          }`}>{subtopic.quiz_score}%</span>
+                        )}
                       </div>
                     </div>
                   </div>
