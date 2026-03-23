@@ -26,7 +26,7 @@ function getTransporter() {
 
 // Reminder preferences stored in memory (per user_id)
 // Persisted to MongoDB via a dedicated collection
-const defaultPrefs = { enabled: true, minutesBefore: 30 };
+const defaultPrefs = { enabled: true, minutesBefore: 60 };
 const userPrefs = new Map();
 
 export function getReminderPrefs(userId) {

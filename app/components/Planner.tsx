@@ -39,7 +39,7 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
 
   // Reminder preferences
   const [reminderEnabled, setReminderEnabled] = useState(true);
-  const [reminderMinutes, setReminderMinutes] = useState(30);
+  const [reminderMinutes, setReminderMinutes] = useState(60);
   const [reminderSaving, setReminderSaving] = useState(false);
 
   useEffect(() => {
