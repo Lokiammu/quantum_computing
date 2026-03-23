@@ -80,6 +80,7 @@ import authRoutes from "./routes/auth.js";
 import dataRoutes from "./routes/data.js";
 import aiRoutes, { loadLearningVideosStore } from "./routes/ai.js";
 import qsvmRoutes from "./routes/qsvm.js";
+import { startReminderService } from "./services/reminder.js";
 
 app.use(authRoutes);
 app.use(dataRoutes);
@@ -92,6 +93,8 @@ loadLearningVideosStore()
   .then(() => {
     app.listen(PORT, "0.0.0.0", () => {
       process.stdout.write(`API listening on http://127.0.0.1:${PORT}\n`);
+      // Start email reminder service
+      startReminderService();
       // Startup env check
       const check = (label, key) => {
         const v = process.env[key];

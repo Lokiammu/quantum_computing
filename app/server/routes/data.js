@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { Agent, TaskDoc, Schedule, Analytics } from "../models.js";
+import { getReminderPrefs, setReminderPrefs } from "../services/reminder.js";
 
 const router = Router();
 
@@ -87,6 +88,24 @@ router.get("/api/data/analytics", async (req, res) => {
     if (agentId) query.agent_id = agentId;
     const docs = await Analytics.find(query).sort({ timestamp: -1 }).limit(500);
     return res.json({ ok: true, analytics: docs });
+  } catch (err) { return res.status(500).json({ error: err?.message || "Failed" }); }
+});
+
+// ── Reminder Preferences ─────────────────────────────────────────────────────
+router.get("/api/data/reminder-prefs", (req, res) => {
+  try {
+    const uid = String(req.query.uid || "");
+    if (!uid) return res.status(400).json({ error: "uid required" });
+    return res.json({ ok: true, prefs: getReminderPrefs(uid) });
+  } catch (err) { return res.status(500).json({ error: err?.message || "Failed" }); }
+});
+
+router.post("/api/data/reminder-prefs", (req, res) => {
+  try {
+    const { uid, prefs } = req.body || {};
+    if (!uid) return res.status(400).json({ error: "uid required" });
+    const updated = setReminderPrefs(uid, prefs || {});
+    return res.json({ ok: true, prefs: updated });
   } catch (err) { return res.status(500).json({ error: err?.message || "Failed" }); }
 });
 

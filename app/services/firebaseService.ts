@@ -82,5 +82,15 @@ export const firebaseService = {
 
   async saveAnalytics(user_id: string, agent_id: string, event_type: string, data: Record<string, unknown>): Promise<void> {
     await post("/api/data/analytics", { user_id, agent_id, event_type, data });
+  },
+
+  async getReminderPrefs(uid: string): Promise<{ enabled: boolean; minutesBefore: number }> {
+    const res = await api<{ ok: boolean; prefs: { enabled: boolean; minutesBefore: number } }>(`/api/data/reminder-prefs?uid=${uid}`);
+    return res.prefs;
+  },
+
+  async saveReminderPrefs(uid: string, prefs: { enabled?: boolean; minutesBefore?: number }): Promise<{ enabled: boolean; minutesBefore: number }> {
+    const res = await post<{ ok: boolean; prefs: { enabled: boolean; minutesBefore: number } }>("/api/data/reminder-prefs", { uid, prefs });
+    return res.prefs;
   }
 };

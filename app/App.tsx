@@ -1116,7 +1116,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeScreen === 'planner' && <Planner tasks={tasks} schedule={schedule} agents={agents} onStartSession={handleStartSessionFromPlanner} onUpdateSchedule={(updated) => { setSchedule(updated); if (currentUser) firebaseService.saveSchedule(currentUser.uid, updated); }} />}
+        {activeScreen === 'planner' && <Planner tasks={tasks} schedule={schedule} agents={agents} currentUser={currentUser} onStartSession={handleStartSessionFromPlanner} onUpdateSchedule={(updated) => { setSchedule(updated); if (currentUser) firebaseService.saveSchedule(currentUser.uid, updated); }} />}
         {activeScreen === 'stats' && <Dashboard agents={agents} />}
         {activeScreen === 'me' && (
           <Profile

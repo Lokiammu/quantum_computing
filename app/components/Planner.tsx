@@ -1,17 +1,19 @@
 
-import React, { useState, useMemo } from 'react';
-import { Task, ScheduleEvent, LearningAgent } from '../types';
-import { Clock, Settings2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Task, ScheduleEvent, LearningAgent, User } from '../types';
+import { Clock, Settings2, Bell, BellOff } from 'lucide-react';
+import { firebaseService } from '../services/firebaseService';
 
 interface PlannerProps {
   tasks: Task[];
   schedule: ScheduleEvent[];
   agents: LearningAgent[];
+  currentUser: User | null;
   onStartSession: (agentId: string, subtopicId: string) => void;
   onUpdateSchedule: (updated: ScheduleEvent[]) => void;
 }
 
-const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSession, onUpdateSchedule }) => {
+const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser, onStartSession, onUpdateSchedule }) => {
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -19,7 +21,6 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
   });
   const [showScheduler, setShowScheduler] = useState(false);
   const [studyHour, setStudyHour] = useState(() => {
-    // Derive default from first study event or default 10 AM
     const first = schedule.find(e => e.type === 'study');
     return first ? new Date(first.start_time).getHours() : 10;
   });
@@ -35,6 +36,34 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
     }
     return 120;
   });
+
+  // Reminder preferences
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderMinutes, setReminderMinutes] = useState(30);
+  const [reminderSaving, setReminderSaving] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      firebaseService.getReminderPrefs(currentUser.uid).then(prefs => {
+        setReminderEnabled(prefs.enabled);
+        setReminderMinutes(prefs.minutesBefore);
+      }).catch(() => {});
+    }
+  }, [currentUser?.uid]);
+
+  const saveReminderPrefs = async (enabled: boolean, minutes: number) => {
+    if (!currentUser?.uid) return;
+    setReminderSaving(true);
+    try {
+      const updated = await firebaseService.saveReminderPrefs(currentUser.uid, { enabled, minutesBefore: minutes });
+      setReminderEnabled(updated.enabled);
+      setReminderMinutes(updated.minutesBefore);
+    } catch (e) {
+      console.error('Failed to save reminder prefs:', e);
+    } finally {
+      setReminderSaving(false);
+    }
+  };
 
   // Generate 14 days for the horizontal picker
   const dates = useMemo(() => {
@@ -178,6 +207,50 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, onStartSessi
 
               <p className="text-[10px] text-white/30 font-medium">
                 Currently: {formatTime(studyHour, studyMinute)} daily · {sessionDuration >= 60 ? `${Math.floor(sessionDuration / 60)}h${sessionDuration % 60 ? ` ${sessionDuration % 60}m` : ''}` : `${sessionDuration}m`} per session
+              </p>
+            </div>
+
+            {/* Email Reminder Settings */}
+            <div className="figma-glass-blue p-6 rounded-2xl space-y-5 mt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {reminderEnabled ? <Bell size={16} className="text-emerald-300" /> : <BellOff size={16} className="text-white/40" />}
+                  <h3 className="text-sm font-black text-white">Email Reminders</h3>
+                </div>
+                <button
+                  onClick={() => saveReminderPrefs(!reminderEnabled, reminderMinutes)}
+                  disabled={reminderSaving}
+                  className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
+                    reminderEnabled ? 'bg-emerald-400' : 'bg-white/20'
+                  }`}
+                >
+                  <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all duration-300 ${
+                    reminderEnabled ? 'left-6' : 'left-1'
+                  }`} />
+                </button>
+              </div>
+
+              {reminderEnabled && (
+                <div className="flex items-center gap-4 animate-in fade-in duration-200">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 shrink-0">Remind me</label>
+                  <select
+                    value={reminderMinutes}
+                    onChange={e => saveReminderPrefs(true, Number(e.target.value))}
+                    className="flex-1 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
+                  >
+                    {[10, 15, 30, 45, 60, 120].map(m => (
+                      <option key={m} value={m} className="bg-slate-900">
+                        {m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`} before
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <p className="text-[10px] text-white/30 font-medium">
+                {reminderEnabled
+                  ? `You'll receive an email ${reminderMinutes >= 60 ? `${reminderMinutes / 60}h` : `${reminderMinutes}min`} before each study session`
+                  : 'Email reminders are turned off'}
               </p>
             </div>
           </div>
