@@ -16,7 +16,8 @@ import Navbar from './components/Navbar';
 import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon, Lock, CheckCircle2, Trash2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [activeScreen, setActiveScreen] = useState<'home' | 'planner' | 'stats' | 'about' | 'me'>('home');
+  const [activeScreen, setActiveScreen] = useState<'home' | 'planner' | 'stats' | 'me'>('home');
+  const [showLanding, setShowLanding] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthMode, setIsAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'auth' | 'registerOtp' | 'forgotEmail' | 'resetOtp' | 'resetPassword'>('auth');
@@ -608,6 +609,26 @@ const App: React.FC = () => {
   };
 
   if (!currentUser) {
+    // Show About landing page before login
+    if (showLanding) {
+      return (
+        <div className="min-h-screen figma-bg flex flex-col text-white relative overflow-x-hidden">
+          <AbstractBackground />
+          <div className="flex-1 overflow-y-auto">
+            <About />
+            <div className="text-center pb-16">
+              <button
+                onClick={() => setShowLanding(false)}
+                className="px-14 py-6 bg-white text-[#0d62bb] rounded-[2rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-50 hover:-translate-y-1 active:scale-95 transition-all text-lg"
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen figma-bg flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
         <AbstractBackground />
@@ -1119,7 +1140,7 @@ const App: React.FC = () => {
 
         {activeScreen === 'planner' && <Planner tasks={tasks} schedule={schedule} agents={agents} currentUser={currentUser} onStartSession={handleStartSessionFromPlanner} onUpdateSchedule={(updated) => { setSchedule(updated); if (currentUser) firebaseService.saveSchedule(currentUser.uid, updated); }} />}
         {activeScreen === 'stats' && <Dashboard agents={agents} />}
-        {activeScreen === 'about' && <About />}
+
         {activeScreen === 'me' && (
           <Profile
             user={currentUser}
@@ -1135,8 +1156,7 @@ const App: React.FC = () => {
           { id: 'home', label: 'Subjects', icon: Home },
           { id: 'planner', label: 'Schedule', icon: Calendar },
           { id: 'stats', label: 'Velocity', icon: Zap },
-          { id: 'me', label: 'Profile', icon: UserIcon },
-          { id: 'about', label: 'About', icon: Sparkles }
+          { id: 'me', label: 'Profile', icon: UserIcon }
         ].map(n => (
           <button key={n.id} onClick={() => { setActiveScreen(n.id as any); setSelectedAgentId(null); }} className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-[1.5rem] transition-all duration-300 ${activeScreen === n.id ? 'text-white' : 'text-white/50 hover:text-white/80'}`}>
             {activeScreen === n.id && (
