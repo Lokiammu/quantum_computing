@@ -71,7 +71,8 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   // Ref callback — attaches stream to video element whenever it appears in DOM
   const webcamRefCallback = (el: HTMLVideoElement | null) => {
     webcamVideoRef.current = el;
-    if (el && webcamStreamRef.current && !el.srcObject) {
+    if (el && webcamStreamRef.current) {
+      // Always re-attach (element may be new after conditional render)
       el.srcObject = webcamStreamRef.current;
       el.play().catch(() => {});
     }
@@ -462,6 +463,8 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   if (isSynthesizing) {
     return (
       <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-300">
+        {/* Hidden webcam — keeps stream alive so it's ready when main UI renders */}
+        <video ref={webcamRefCallback} autoPlay muted playsInline className="hidden" />
         <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-8 shadow-xl"></div>
         <h2 className="text-3xl font-black italic tracking-tighter">Sourcing Academic Bundle...</h2>
         <p className="text-slate-500 font-medium mt-3 max-w-sm">Gathering readable textbooks, PDF notes, and topic-specific resources from global libraries.</p>
