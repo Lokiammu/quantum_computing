@@ -49,10 +49,17 @@ const About: React.FC = () => {
   ];
 
   const techStack = [
-    { label: 'Frontend', items: ['React', 'TypeScript', 'Vite', 'TailwindCSS'] },
-    { label: 'AI Engine', items: ['GPT-4o-mini', 'OpenRouter', 'Groq Fallback'] },
-    { label: 'Quantum ML', items: ['Qiskit QSVM', 'QAOA Optimizer', 'Scikit-learn'] },
-    { label: 'Backend', items: ['Express.js', 'Node.js', 'YouTube Data API'] },
+    { label: 'Frontend', items: ['React 19', 'TypeScript', 'Vite', 'TailwindCSS', 'Recharts'] },
+    { label: 'AI Engine', items: ['OpenRouter', 'Ollama Fallback', 'arcee-ai/trinity'] },
+    { label: 'Quantum ML', items: ['Qiskit QSVM', 'QAOA Optimizer', 'Scikit-learn', 'ZZFeatureMap'] },
+    { label: 'Backend', items: ['Express.js', 'MongoDB', 'Nodemailer', 'YouTube API'] },
+  ];
+
+  const teamMembers = [
+    { name: 'Veera Kalyani Hema Tayaru Padala', role: 'Team Member' },
+    { name: 'Relli Gopikanjali', role: 'Team Member' },
+    { name: 'Teegireddy Sujitha', role: 'Team Member' },
+    { name: 'Pani Siri', role: 'Team Member' },
   ];
 
   return (
@@ -174,6 +181,42 @@ const About: React.FC = () => {
         </div>
       </div>
 
+      {/* Project Team */}
+      <div className="space-y-8">
+        <div className="text-center space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">The Team</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Project Credits</h2>
+        </div>
+
+        {/* Project Guide */}
+        <div className="figma-glass-blue p-8 md:p-10 rounded-[2.5rem] border border-indigo-400/30 text-center relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 blur-[80px] rounded-full translate-x-1/3 -translate-y-1/3" />
+          <div className="relative z-10">
+            <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-[1.5rem] flex items-center justify-center mx-auto mb-5 shadow-xl shadow-amber-500/20 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300 border border-white/20 text-white font-black text-2xl">
+              PVS
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-2">Project Guide</p>
+            <h3 className="text-2xl font-black text-white">Dr. P.V.S. Lakshmi Jagadamba</h3>
+          </div>
+        </div>
+
+        {/* Team Members */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {teamMembers.map((member, i) => (
+            <div key={i} className="group figma-glass p-6 rounded-[2rem] text-center hover:-translate-y-1 hover:shadow-xl transition-all duration-300 border border-white/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl -mr-8 -mt-8 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-[1.2rem] flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 border border-white/20 text-white font-black text-lg">
+                  {member.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+                </div>
+                <h4 className="font-black text-white text-sm leading-tight mb-1">{member.name}</h4>
+                <p className="text-[9px] font-black uppercase tracking-widest text-white/40">{member.role}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Footer / Credits */}
       <div className="text-center space-y-6 pt-8">
         <div className="figma-glass inline-flex items-center gap-3 px-6 py-3 rounded-full border border-white/20">
@@ -182,7 +225,7 @@ const About: React.FC = () => {
           <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Quantum Edition</span>
         </div>
         <p className="text-white/30 text-xs font-bold">
-          Built with ❤️ using React, Qiskit & AI — Transforming education through quantum intelligence.
+          Built with React, Qiskit & AI — Transforming education through quantum intelligence.
         </p>
       </div>
     </div>
