@@ -17,7 +17,10 @@ import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon, Lock, CheckCir
 
 const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<'home' | 'planner' | 'stats' | 'me'>('home');
-  const [showLanding, setShowLanding] = useState(true);
+  // Only show landing if no saved session (first visit / logged out)
+  const [showLanding, setShowLanding] = useState(() => {
+    try { return !localStorage.getItem('fb_session'); } catch { return true; }
+  });
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthMode, setIsAuthMode] = useState<'login' | 'register'>('login');
   const [authStep, setAuthStep] = useState<'auth' | 'registerOtp' | 'forgotEmail' | 'resetOtp' | 'resetPassword'>('auth');

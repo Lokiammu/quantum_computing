@@ -69,13 +69,14 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   const consecutiveMissRef = useRef(0);
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  const [sessionStarted, setSessionStarted] = useState(false);
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 160 }, height: { ideal: 160 }, facingMode: 'user' } });
       webcamStreamRef.current = stream;
       setCameraActive(true);
       setCameraError(false);
-      // Attach to video element if it exists
       if (webcamVideoRef.current) {
         webcamVideoRef.current.srcObject = stream;
         webcamVideoRef.current.play().catch(() => {});
@@ -87,6 +88,13 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     }
   };
 
+  // Called on user click — gets camera permission + enters fullscreen (user gesture required for both)
+  const handleStartSession = async () => {
+    await startCamera();
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    setSessionStarted(true);
+  };
+
   // Ref callback — attaches stream to video element whenever it mounts
   const webcamRefCallback = (el: HTMLVideoElement | null) => {
     webcamVideoRef.current = el;
@@ -96,11 +104,8 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     }
   };
 
-  // Start camera first, then fullscreen (camera prompt needs non-fullscreen context)
+  // Cleanup on unmount
   useEffect(() => {
-    startCamera().then(() => {
-      document.documentElement.requestFullscreen?.().catch(() => {});
-    });
     return () => {
       webcamStreamRef.current?.getTracks().forEach(t => t.stop());
       webcamStreamRef.current = null;
@@ -158,8 +163,8 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
   };
 
   useEffect(() => {
-    if (!subtopic.is_synthesized || !bundle) synthesizeNode();
-  }, [subtopic.id]);
+    if (sessionStarted && (!subtopic.is_synthesized || !bundle)) synthesizeNode();
+  }, [subtopic.id, sessionStarted]);
 
   useEffect(() => {
     timerRef.current = setInterval(() => {
@@ -461,10 +466,29 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     return () => clearInterval(interval);
   }, [activeTab, agent.chat_history.length, focusTime, timeSpent]);
 
+  // Gate: user must click to grant camera + enter fullscreen
+  if (!sessionStarted) {
+    return (
+      <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-300">
+        <div className="w-24 h-24 bg-indigo-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+          <GraduationCap size={48} className="text-indigo-600" />
+        </div>
+        <h2 className="text-3xl font-black italic tracking-tighter mb-3">{subtopic.title}</h2>
+        <p className="text-slate-500 font-medium max-w-sm mb-10">This session will use your camera for focus monitoring and enter fullscreen mode.</p>
+        <button
+          onClick={handleStartSession}
+          className="px-14 py-6 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-2xl hover:bg-indigo-700 active:scale-95 transition-all text-lg"
+        >
+          Start Session
+        </button>
+        <button onClick={onExit} className="mt-6 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">Go Back</button>
+      </div>
+    );
+  }
+
   if (isSynthesizing) {
     return (
       <div className="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-300">
-        {/* Hidden webcam — keeps stream alive so it's ready when main UI renders */}
         <video ref={webcamRefCallback} autoPlay muted playsInline className="hidden" />
         <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-8 shadow-xl"></div>
         <h2 className="text-3xl font-black italic tracking-tighter">Sourcing Academic Bundle...</h2>
