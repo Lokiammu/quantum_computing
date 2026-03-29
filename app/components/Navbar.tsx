@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Home, Calendar, Zap, User as UserIcon, LogOut, BrainCircuit } from 'lucide-react';
-import { User } from '../types'; // Adjust typing import as necessary
+import { User } from '../types';
 
 interface NavbarProps {
   currentUser: User | { name: string, uid: string } | any;
@@ -13,80 +13,83 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ currentUser, activeScreen, setActiveScreen, setSelectedAgentId, onLogout }) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
+  const navItems = [
+    { id: 'home', label: 'Subjects', icon: Home },
+    { id: 'planner', label: 'Schedule', icon: Calendar },
+    { id: 'stats', label: 'Analytics', icon: Zap },
+    { id: 'me', label: 'Profile', icon: UserIcon }
+  ];
+
   return (
-    <header className="hidden md:flex h-20 items-center justify-between px-8 figma-glass mx-6 mt-6 mb-8 sticky top-6 z-[100] transition-all duration-300 border border-white/20 shadow-2xl backdrop-blur-xl rounded-[2rem]">
-      {/* Brand / Logo */}
-      <div 
-        className="flex items-center gap-4 group cursor-pointer"
-        onClick={() => { setActiveScreen('home'); setSelectedAgentId(null); }}
-      >
-        <div className="w-12 h-12 bg-gradient-to-br from-white to-blue-50 rounded-[1.2rem] flex items-center justify-center text-[#0d62bb] shadow-lg shadow-white/20 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300 border border-white/50 relative overflow-hidden">
-          <BrainCircuit size={28} className="relative z-10" />
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/50 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-black text-2xl tracking-tighter text-white leading-none">SmartLearn</span>
-          <span className="text-[9px] font-black uppercase tracking-widest text-white/50 mt-1">Quantum Edition</span>
-        </div>
-      </div>
-      
-      {/* Navigation Links */}
-      <nav className="flex items-center gap-10">
-        {[
-          { id: 'home', label: 'Subjects', icon: Home },
-          { id: 'planner', label: 'Schedule', icon: Calendar },
-          { id: 'stats', label: 'Velocity', icon: Zap },
-          { id: 'me', label: 'Profile', icon: UserIcon }
-        ].map(n => (
-          <button 
-            key={n.id} 
-            onClick={() => { setActiveScreen(n.id as any); setSelectedAgentId(null); }} 
-            className={`group relative flex items-center gap-2.5 transition-all font-black text-[11px] uppercase tracking-widest py-2 ${activeScreen === n.id ? 'text-white' : 'text-white/60 hover:text-white'}`}
-          >
-            <n.icon size={16} className={`transition-transform duration-300 ${activeScreen === n.id ? 'scale-110 drop-shadow-md text-white' : 'group-hover:scale-110 group-hover:-rotate-6 text-white/60 group-hover:text-white'}`} />
-            {n.label}
-            {activeScreen === n.id && (
-              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-8 h-1.5 rounded-t-[4px] bg-white shadow-[0_0_10px_#fff] animate-in fade-in zoom-in duration-300"></span>
-            )}
-          </button>
-        ))}
-      </nav>
-      
-      {/* User Actions */}
-      <div className="flex items-center gap-6 relative">
-        <button 
-          onClick={() => setShowDropdown(!showDropdown)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-          className="flex items-center gap-3 bg-white/10 hover:bg-white/20 active:scale-95 px-4 py-2.5 rounded-full border border-white/20 backdrop-blur-md transition-all shadow-sm"
+    <>
+      {/* ── Desktop Left Sidebar ──────────────────────────────────── */}
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[72px] flex-col items-center py-6 z-[100] bg-[#111113]/60 backdrop-blur-xl border-r border-white/[0.04]">
+        {/* Logo */}
+        <button
+          onClick={() => { setActiveScreen('home'); setSelectedAgentId(null); }}
+          className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#c4b998] to-[#a89870] flex items-center justify-center mb-8 hover:scale-105 transition-transform shadow-lg shadow-[#c4b998]/10"
         >
-          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-black text-[#0d62bb] text-xs shadow-md border border-white/50">
-            {currentUser?.name?.[0]?.toUpperCase() || 'U'}
-          </div>
-          <span className="text-[11px] font-black text-white uppercase tracking-widest pr-1">
-            {currentUser?.name || 'User'}
-          </span>
+          <BrainCircuit size={22} className="text-[#111113]" />
         </button>
 
-        {/* Dropdown Menu */}
-        {showDropdown && (
-          <div className="absolute top-[120%] right-0 w-48 figma-glass border border-white/20 rounded-3xl p-2 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
+        {/* Nav Icons */}
+        <nav className="flex-1 flex flex-col items-center gap-2">
+          {navItems.map(n => (
             <button
-              onClick={() => { setActiveScreen('me'); setSelectedAgentId(null); setShowDropdown(false); }}
-              className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white/80 hover:text-white hover:bg-white/10 rounded-2xl transition-colors"
+              key={n.id}
+              onClick={() => { setActiveScreen(n.id as any); setSelectedAgentId(null); }}
+              className={`group relative w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
+                activeScreen === n.id
+                  ? 'bg-white/10 text-[#e8e4dc]'
+                  : 'text-white/30 hover:text-white/60 hover:bg-white/[0.04]'
+              }`}
+              title={n.label}
             >
-              <UserIcon size={16} /> Profile
+              <n.icon size={20} />
+              {activeScreen === n.id && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[#c4b998]" />
+              )}
+              {/* Tooltip */}
+              <span className="absolute left-full ml-3 px-3 py-1.5 rounded-lg bg-[#1e1e22] text-[11px] font-semibold text-[#e8e4dc] whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity border border-white/10 shadow-xl z-50">
+                {n.label}
+              </span>
             </button>
-            <div className="my-1 h-px w-full bg-white/10"></div>
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-rose-300 hover:text-rose-100 hover:bg-rose-500/20 rounded-2xl transition-colors"
-            >
-              <LogOut size={16} /> Log Out
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
+          ))}
+        </nav>
+
+        {/* Bottom: User Avatar */}
+        <div className="relative">
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c4b998] to-[#a89870] flex items-center justify-center font-bold text-[#111113] text-sm hover:scale-105 transition-transform shadow-lg shadow-[#c4b998]/10"
+          >
+            {currentUser?.name?.[0]?.toUpperCase() || 'U'}
+          </button>
+
+          {showDropdown && (
+            <div className="absolute left-full bottom-0 ml-3 w-48 bg-[#1e1e22] border border-white/10 rounded-2xl p-2 shadow-2xl animate-in fade-in slide-in-from-left-2 duration-200 z-50">
+              <div className="px-4 py-2.5 border-b border-white/5 mb-1">
+                <p className="text-xs font-semibold text-[#e8e4dc] truncate">{currentUser?.name || 'User'}</p>
+                <p className="text-[10px] text-white/30 truncate">{currentUser?.email || ''}</p>
+              </div>
+              <button
+                onClick={() => { setActiveScreen('me'); setSelectedAgentId(null); setShowDropdown(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-semibold text-white/60 hover:text-[#e8e4dc] hover:bg-white/[0.04] rounded-xl transition-colors"
+              >
+                <UserIcon size={14} /> Profile
+              </button>
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-semibold text-rose-400/60 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors"
+              >
+                <LogOut size={14} /> Log Out
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };
 

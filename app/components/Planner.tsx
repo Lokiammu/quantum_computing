@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, ScheduleEvent, LearningAgent, User } from '../types';
-import { Clock, Settings2, Bell, BellOff } from 'lucide-react';
+import { Clock, Settings2, Bell, BellOff, ChevronRight, Calendar } from 'lucide-react';
 import { firebaseService } from '../services/firebaseService';
 
 interface PlannerProps {
@@ -37,7 +37,6 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
     return 120;
   });
 
-  // Reminder preferences
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [reminderMinutes, setReminderMinutes] = useState(60);
   const [reminderSaving, setReminderSaving] = useState(false);
@@ -65,7 +64,6 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
     }
   };
 
-  // Generate 14 days for the horizontal picker
   const dates = useMemo(() => {
     const arr = [];
     const base = new Date();
@@ -82,7 +80,6 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
     const start = new Date(selectedDate);
     const end = new Date(selectedDate);
     end.setHours(23, 59, 59, 999);
-
     return schedule.filter(e => {
       const d = new Date(e.start_time);
       return d >= start && d <= end;
@@ -93,11 +90,9 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
     const today = new Date();
     today.setHours(0,0,0,0);
     if (date.getTime() === today.getTime()) return "Today";
-
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
     if (date.getTime() === tomorrow.getTime()) return "Tomorrow";
-
     return date.toLocaleDateString('en-US', { weekday: 'short' });
   };
 
@@ -126,285 +121,271 @@ const Planner: React.FC<PlannerProps> = ({ tasks, schedule, agents, currentUser,
     return schedule.filter(e => { const d = new Date(e.start_time); return d >= start && d <= end; }).length;
   };
 
+  const inputClass = "w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[#e8e4dc] font-medium text-sm outline-none focus:border-[#c4b998]/40 transition-colors";
+
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500">
-      {/* Header with scheduler toggle */}
-      <div className="sticky top-0 z-10 figma-glass mx-6 mt-6 rounded-[2rem] px-6 py-6 mb-4 shadow-sm border-white/20">
-        <div className="flex items-center justify-between mb-6 px-2">
-          <h2 className="text-3xl font-black tracking-tighter text-white">Daily Schedule</h2>
-          <button
-            onClick={() => setShowScheduler(!showScheduler)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-              showScheduler
-                ? 'bg-white text-[#0d62bb] border-transparent shadow-lg'
-                : 'bg-white/10 text-white/70 border-white/20 hover:bg-white/20 hover:text-white'
-            }`}
-          >
-            <Settings2 size={14} />
-            {showScheduler ? 'Close' : 'Settings'}
-          </button>
+    <div className="flex flex-col h-full animate-in fade-in duration-500 p-6 md:p-10 max-w-7xl mx-auto w-full">
+
+      {/* ── Header ───────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-3xl md:text-4xl font-bold text-[#e8e4dc] tracking-tight">Schedule</h2>
+          <p className="text-sm md:text-base text-white/30 mt-1">{selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </div>
-
-        {/* Scheduler Settings Panel */}
-        {showScheduler && (
-          <div className="mb-6 px-2 animate-in slide-in-from-top-2 duration-300">
-            <div className="figma-glass-blue p-6 rounded-2xl space-y-5">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock size={16} className="text-indigo-300" />
-                <h3 className="text-sm font-black text-white">Study Schedule Settings</h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Start Time */}
-                <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2 block">Start Time</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={studyHour}
-                      onChange={e => setStudyHour(Number(e.target.value))}
-                      className="flex-1 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
-                    >
-                      {Array.from({ length: 24 }, (_, i) => (
-                        <option key={i} value={i} className="bg-slate-900">{(i % 12 || 12).toString().padStart(2, '0')} {i >= 12 ? 'PM' : 'AM'}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={studyMinute}
-                      onChange={e => setStudyMinute(Number(e.target.value))}
-                      className="w-20 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
-                    >
-                      {[0, 15, 30, 45].map(m => (
-                        <option key={m} value={m} className="bg-slate-900">{m.toString().padStart(2, '0')}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Duration */}
-                <div>
-                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 mb-2 block">Session Duration</label>
-                  <select
-                    value={sessionDuration}
-                    onChange={e => setSessionDuration(Number(e.target.value))}
-                    className="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
-                  >
-                    {[30, 45, 60, 90, 120, 150, 180].map(d => (
-                      <option key={d} value={d} className="bg-slate-900">{d >= 60 ? `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}m` : ''}` : `${d}m`}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Apply */}
-                <div className="flex items-end">
-                  <button
-                    onClick={applyScheduleChange}
-                    className="w-full p-3 bg-white text-[#0d62bb] rounded-xl font-black text-sm shadow-lg hover:bg-slate-50 transition-all active:scale-95"
-                  >
-                    Apply to All
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-[10px] text-white/30 font-medium">
-                Currently: {formatTime(studyHour, studyMinute)} daily · {sessionDuration >= 60 ? `${Math.floor(sessionDuration / 60)}h${sessionDuration % 60 ? ` ${sessionDuration % 60}m` : ''}` : `${sessionDuration}m`} per session
-              </p>
-            </div>
-
-            {/* Email Reminder Settings */}
-            <div className="figma-glass-blue p-6 rounded-2xl space-y-5 mt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {reminderEnabled ? <Bell size={16} className="text-emerald-300" /> : <BellOff size={16} className="text-white/40" />}
-                  <h3 className="text-sm font-black text-white">Email Reminders</h3>
-                </div>
-                <button
-                  onClick={() => saveReminderPrefs(!reminderEnabled, reminderMinutes)}
-                  disabled={reminderSaving}
-                  className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
-                    reminderEnabled ? 'bg-emerald-400' : 'bg-white/20'
-                  }`}
-                >
-                  <span className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all duration-300 ${
-                    reminderEnabled ? 'left-6' : 'left-1'
-                  }`} />
-                </button>
-              </div>
-
-              {reminderEnabled && (
-                <div className="flex items-center gap-4 animate-in fade-in duration-200">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-white/40 shrink-0">Remind me</label>
-                  <select
-                    value={reminderMinutes}
-                    onChange={e => saveReminderPrefs(true, Number(e.target.value))}
-                    className="flex-1 p-3 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-sm outline-none focus:border-white/50 transition-colors"
-                  >
-                    {[10, 15, 30, 45, 60, 120].map(m => (
-                      <option key={m} value={m} className="bg-slate-900">
-                        {m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`} before
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <p className="text-[10px] text-white/30 font-medium">
-                {reminderEnabled
-                  ? `You'll receive an email ${reminderMinutes >= 60 ? `${reminderMinutes / 60}h` : `${reminderMinutes}min`} before each study session`
-                  : 'Email reminders are turned off'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Date Picker */}
-        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth px-2">
-          {dates.map((date, idx) => {
-            const isSelected = date.getTime() === selectedDate.getTime();
-            const count = dayEventCount(date);
-            return (
-              <button
-                key={idx}
-                onClick={() => setSelectedDate(date)}
-                className={`flex flex-col items-center min-w-[75px] py-4 rounded-3xl transition-all duration-300 border relative ${
-                  isSelected
-                  ? 'bg-white text-[#0d62bb] border-transparent shadow-lg shadow-black/20 -translate-y-1'
-                  : 'bg-white/5 border-white/10 text-white/50 hover:border-white/30 hover:text-white/80 hover:-translate-y-1'
-                }`}
-              >
-                <span className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-90">
-                  {formatDateLabel(date)}
-                </span>
-                <span className="text-2xl font-black">{date.getDate()}</span>
-                {count > 0 && (
-                  <div className={`mt-1 flex gap-0.5 ${isSelected ? '' : ''}`}>
-                    {Array.from({ length: Math.min(count, 4) }, (_, i) => (
-                      <span key={i} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[#0d62bb]/40' : 'bg-white/30'}`} />
-                    ))}
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <button
+          onClick={() => setShowScheduler(!showScheduler)}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold transition-all border ${
+            showScheduler
+              ? 'bg-[#c4b998] text-[#111113] border-transparent shadow-lg shadow-[#c4b998]/15'
+              : 'bg-white/[0.04] text-white/50 border-white/[0.08] hover:bg-white/[0.08] hover:text-[#e8e4dc]'
+          }`}
+        >
+          <Settings2 size={16} />
+          Settings
+        </button>
       </div>
 
-      {/* Timeline View */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8 pb-32 custom-scrollbar">
+      {/* ── Settings Panel ───────────────────────────────────────── */}
+      {showScheduler && (
+        <div className="mb-8 space-y-5 animate-in slide-in-from-top-2 duration-300">
+          {/* Time Settings */}
+          <div className="figma-glass p-7 md:p-8 space-y-5">
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-9 h-9 rounded-xl bg-[#c4b998]/10 border border-[#c4b998]/15 flex items-center justify-center">
+                <Clock size={17} className="text-[#c4b998]" />
+              </div>
+              <h3 className="text-base font-semibold text-[#e8e4dc]">Study Time</h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-medium text-white/30 mb-2 block ml-0.5">Start Time</label>
+                <div className="flex gap-2">
+                  <select value={studyHour} onChange={e => setStudyHour(Number(e.target.value))} className={inputClass}>
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i} className="bg-[#1a1a1e]">{(i % 12 || 12).toString().padStart(2, '0')} {i >= 12 ? 'PM' : 'AM'}</option>
+                    ))}
+                  </select>
+                  <select value={studyMinute} onChange={e => setStudyMinute(Number(e.target.value))} className={`${inputClass} w-24`}>
+                    {[0, 15, 30, 45].map(m => (
+                      <option key={m} value={m} className="bg-[#1a1a1e]">{m.toString().padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-white/30 mb-2 block ml-0.5">Duration</label>
+                <select value={sessionDuration} onChange={e => setSessionDuration(Number(e.target.value))} className={inputClass}>
+                  {[30, 45, 60, 90, 120, 150, 180].map(d => (
+                    <option key={d} value={d} className="bg-[#1a1a1e]">{d >= 60 ? `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}m` : ''}` : `${d}m`}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  onClick={applyScheduleChange}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-[#c4b998]/10 transition-all"
+                >
+                  Apply to All
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-white/20 mt-1">
+              Currently: {formatTime(studyHour, studyMinute)} daily · {sessionDuration >= 60 ? `${Math.floor(sessionDuration / 60)}h${sessionDuration % 60 ? ` ${sessionDuration % 60}m` : ''}` : `${sessionDuration}m`} per session
+            </p>
+          </div>
+
+          {/* Reminder Settings */}
+          <div className="figma-glass p-7 md:p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${reminderEnabled ? 'bg-[#8baa6e]/10 border border-[#8baa6e]/15' : 'bg-white/[0.04] border border-white/[0.08]'}`}>
+                  {reminderEnabled ? <Bell size={17} className="text-[#8baa6e]" /> : <BellOff size={17} className="text-white/25" />}
+                </div>
+                <h3 className="text-base font-semibold text-[#e8e4dc]">Email Reminders</h3>
+              </div>
+              <button
+                onClick={() => saveReminderPrefs(!reminderEnabled, reminderMinutes)}
+                disabled={reminderSaving}
+                className={`relative w-12 h-7 rounded-full transition-all duration-200 ${
+                  reminderEnabled ? 'bg-[#8baa6e]' : 'bg-white/10'
+                }`}
+              >
+                <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all duration-200 ${
+                  reminderEnabled ? 'left-[22px]' : 'left-0.5'
+                }`} />
+              </button>
+            </div>
+
+            {reminderEnabled && (
+              <div className="flex items-center gap-4 animate-in fade-in duration-200">
+                <label className="text-xs font-medium text-white/30 shrink-0">Remind me</label>
+                <select
+                  value={reminderMinutes}
+                  onChange={e => saveReminderPrefs(true, Number(e.target.value))}
+                  className={inputClass}
+                >
+                  {[10, 15, 30, 45, 60, 120].map(m => (
+                    <option key={m} value={m} className="bg-[#1a1a1e]">
+                      {m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`} before
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <p className="text-xs text-white/20">
+              {reminderEnabled
+                ? `Email sent ${reminderMinutes >= 60 ? `${reminderMinutes / 60}h` : `${reminderMinutes}min`} before each session`
+                : 'Reminders are off'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Date Picker ──────────────────────────────────────────── */}
+      <div className="flex gap-2.5 overflow-x-auto pb-5 no-scrollbar scroll-smooth mb-8">
+        {dates.map((date, idx) => {
+          const isSelected = date.getTime() === selectedDate.getTime();
+          const count = dayEventCount(date);
+          const isToday = idx === 0;
+          const isFriday = date.getDay() === 5;
+          return (
+            <button
+              key={idx}
+              onClick={() => setSelectedDate(date)}
+              className={`flex flex-col items-center min-w-[76px] py-4 px-3 rounded-2xl transition-all duration-200 border flex-shrink-0 ${
+                isSelected
+                  ? 'bg-[#c4b998]/15 text-[#c4b998] border-[#c4b998]/25 shadow-lg shadow-[#c4b998]/5'
+                  : isFriday
+                  ? 'bg-[#c97070]/[0.06] border-[#c97070]/15 text-white/40 hover:bg-[#c97070]/10'
+                  : 'bg-white/[0.02] border-white/[0.06] text-white/35 hover:bg-white/[0.05] hover:text-white/60'
+              }`}
+            >
+              <span className={`text-[10px] font-semibold uppercase mb-1 tracking-wide ${isSelected ? 'text-[#c4b998]' : isToday ? 'text-[#8baa6e]' : isFriday ? 'text-[#c97070]/70' : ''}`}>
+                {formatDateLabel(date)}
+              </span>
+              <span className={`text-xl font-bold ${isSelected ? 'text-[#c4b998]' : ''}`}>{date.getDate()}</span>
+              {count > 0 && (
+                <div className="mt-1.5 flex gap-0.5">
+                  {Array.from({ length: Math.min(count, 3) }, (_, i) => (
+                    <span key={i} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-[#c4b998]/50' : 'bg-white/20'}`} />
+                  ))}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Events Timeline ──────────────────────────────────────── */}
+      <div className="flex-1 space-y-4 pb-32">
         {selectedDayEvents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-6 max-w-sm mx-auto">
-            <div className="w-24 h-24 bg-white/10 backdrop-blur-md shadow-sm rounded-full flex items-center justify-center text-5xl">🏜️</div>
+          <div className="flex flex-col items-center justify-center py-24 text-center space-y-5">
+            <div className="w-20 h-20 bg-white/[0.04] border border-white/[0.06] rounded-2xl flex items-center justify-center">
+              <Calendar size={36} className="text-white/15" />
+            </div>
             <div>
-              <p className="text-2xl font-black text-white drop-shadow-sm">All Clear!</p>
-              <p className="text-sm font-bold text-white/50 mt-2 leading-relaxed">No sessions scheduled for this day. Enjoy your free time or schedule a new module.</p>
+              <p className="text-xl font-bold text-[#e8e4dc]">No sessions</p>
+              <p className="text-base text-white/25 mt-1.5">Nothing scheduled for this day.</p>
             </div>
           </div>
         ) : (
-          <div className="mx-4 lg:mx-8 space-y-8 relative before:absolute before:inset-y-0 before:left-4 before:w-1 before:bg-white/10 before:rounded-full">
-            {selectedDayEvents.map((event, idx) => {
-              const isStudy = event.type === 'study';
-              const agent = isStudy ? agents.find(a => a.id === event.agent_id) : null;
-              const subtopic = agent ? agent.roadmap.flatMap(m => m.subtopics).find(s => s.id === event.subtopic_id) : null;
-              const isCompleted = subtopic?.is_completed ?? false;
-              const startTime = new Date(event.start_time);
-              const endTime = new Date(event.end_time);
-              const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+          selectedDayEvents.map((event, idx) => {
+            const isStudy = event.type === 'study';
+            const agent = isStudy ? agents.find(a => a.id === event.agent_id) : null;
+            const subtopic = agent ? agent.roadmap.flatMap(m => m.subtopics).find(s => s.id === event.subtopic_id) : null;
+            const isCompleted = subtopic?.is_completed ?? false;
+            const startTime = new Date(event.start_time);
+            const endTime = new Date(event.end_time);
+            const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
 
-              return (
-                <div key={event.id} className="relative pl-14 group animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                  {/* Timeline Dot */}
-                  <div className={`absolute left-0 top-6 w-9 h-9 rounded-full border-4 border-[#0d62bb] shadow-md z-10 transition-transform group-hover:scale-125 ${
-                    isCompleted ? 'bg-emerald-400' : isStudy ? 'bg-white' : 'bg-rose-400'
-                  }`} />
+            return (
+              <div
+                key={event.id}
+                className={`figma-glass p-6 md:p-7 flex items-start gap-5 transition-all duration-200 ${
+                  isCompleted ? 'border-[#8baa6e]/15' : isStudy ? 'hover:bg-white/[0.06]' : 'border-[#c97070]/15'
+                }`}
+                style={{ animationDelay: `${idx * 40}ms` }}
+              >
+                {/* Time column */}
+                <div className="flex-shrink-0 w-20 pt-0.5">
+                  <p className="text-base font-semibold text-[#e8e4dc]">
+                    {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <p className="text-xs text-white/20 mt-1">
+                    {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}m` : ''}` : `${durationMin}m`}
+                  </p>
+                </div>
 
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-3 pl-1">
-                      <span className="text-[11px] font-black text-white/50 uppercase tracking-widest">
-                        {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      <span className="text-[10px] text-white/20">—</span>
-                      <span className="text-[11px] font-black text-white/30 uppercase tracking-widest">
-                        {endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
+                {/* Accent bar */}
+                <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${
+                  isCompleted ? 'bg-[#8baa6e]' : isStudy ? 'bg-[#c4b998]' : 'bg-[#c97070]'
+                }`} />
 
-                    <div className={`p-8 rounded-[2.5rem] border transition-all duration-300 ${
-                      isCompleted
-                      ? 'figma-glass border-emerald-400/30'
-                      : isStudy
-                      ? 'figma-glass hover:border-white/50 hover:shadow-xl hover:-translate-y-1'
-                      : 'bg-rose-500/20 backdrop-blur-md border-rose-300/30 shadow-sm hover:shadow-md'
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {agent && (
+                    <p className="text-xs font-medium text-white/30 mb-1.5">{agent.subject}</p>
+                  )}
+                  <h4 className="text-base font-semibold text-[#e8e4dc] leading-snug">
+                    {event.title.split(': ').length > 1 ? event.title.split(': ')[1] : event.title}
+                  </h4>
+                  <div className="flex items-center gap-2.5 mt-3">
+                    <span className={`text-[10px] font-medium px-2.5 py-1 rounded-lg ${
+                      isCompleted ? 'bg-[#8baa6e]/10 text-[#8baa6e] border border-[#8baa6e]/15'
+                      : isStudy ? 'bg-white/[0.04] text-white/40 border border-white/[0.06]'
+                      : 'bg-[#c97070]/10 text-[#c97070] border border-[#c97070]/15'
                     }`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                        <div className="flex-1">
-                          {agent && (
-                            <div className="inline-block px-3 py-1 bg-white/10 rounded-full text-[10px] font-black text-white uppercase tracking-widest mb-3 border border-white/20">
-                              {agent.subject}
-                            </div>
-                          )}
-                          <h4 className="text-xl font-black text-white leading-tight">
-                            {event.title.split(': ').length > 1 ? event.title.split(': ')[1] : event.title}
-                          </h4>
-                        </div>
-
-                        {isStudy && event.agent_id && event.subtopic_id && (
-                          isCompleted ? (
-                            <span className="shrink-0 px-6 py-3 bg-emerald-500/20 text-emerald-300 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-400/30">
-                              Completed
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => onStartSession(event.agent_id!, event.subtopic_id!)}
-                              className="shrink-0 px-6 py-3 bg-white text-[#0d62bb] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-lg hover:shadow-white/20 active:scale-95"
-                            >
-                              Launch Lesson
-                            </button>
-                          )
-                        )}
-                      </div>
-
-                      <div className="mt-6 flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                          isCompleted ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/20'
-                          : isStudy ? 'bg-white/20 text-white' : 'bg-rose-500/30 text-rose-100 border border-rose-400/20'
-                        }`}>
-                          {isCompleted ? 'done' : event.type}
-                        </span>
-                        <span className="text-xs font-bold text-white/50 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white/30"></span>
-                          {durationMin >= 60 ? `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}m` : ''}` : `${durationMin}m`}
-                        </span>
-                        {typeof subtopic?.quiz_score === 'number' && (
-                          <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
-                            subtopic.quiz_score >= 70
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                              : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
-                          }`}>{subtopic.quiz_score}%</span>
-                        )}
-                      </div>
-                    </div>
+                      {isCompleted ? 'Done' : event.type}
+                    </span>
+                    {typeof subtopic?.quiz_score === 'number' && (
+                      <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg ${
+                        subtopic.quiz_score >= 70
+                          ? 'bg-[#8baa6e]/10 text-[#8baa6e] border border-[#8baa6e]/15'
+                          : 'bg-[#c97070]/10 text-[#c97070] border border-[#c97070]/15'
+                      }`}>{subtopic.quiz_score}%</span>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Action */}
+                {isStudy && event.agent_id && event.subtopic_id && (
+                  isCompleted ? (
+                    <span className="flex-shrink-0 text-sm font-medium text-[#8baa6e] self-center">Completed</span>
+                  ) : (
+                    <button
+                      onClick={() => onStartSession(event.agent_id!, event.subtopic_id!)}
+                      className="flex-shrink-0 px-5 py-2.5 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-[#c4b998]/10 transition-all self-center flex items-center gap-2"
+                    >
+                      Start <ChevronRight size={14} />
+                    </button>
+                  )
+                )}
+              </div>
+            );
+          })
         )}
 
-        {/* Deadlines Section */}
+        {/* Deadlines */}
         {tasks.length > 0 && (
-          <div className="mt-8 pt-8 mx-4 lg:mx-8 border-t border-white/10">
-            <h3 className="text-xs font-black uppercase text-white/50 tracking-widest mb-6 px-2 flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-rose-400 rounded-full"></span>
+          <div className="mt-10 pt-8 border-t border-white/[0.06]">
+            <h3 className="text-sm font-semibold text-white/30 mb-5 flex items-center gap-2.5">
+              <span className="w-1.5 h-4 bg-[#c97070] rounded-full" />
               Upcoming Deadlines
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {tasks.slice(0, 4).map(task => (
-                <div key={task.id} className="p-6 figma-glass rounded-3xl group hover:shadow-md transition-all flex items-center justify-between">
-                  <div className="pr-4">
-                    <p className="text-sm font-black text-white leading-tight mb-1 group-hover:text-white/80 transition-colors">{task.title}</p>
-                    <p className="text-[10px] font-bold text-white/50">{new Date(task.deadline).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                <div key={task.id} className="figma-glass p-5 md:p-6 flex items-center justify-between">
+                  <div className="pr-4 min-w-0">
+                    <p className="text-base font-semibold text-[#e8e4dc] truncate">{task.title}</p>
+                    <p className="text-xs text-white/25 mt-1">{new Date(task.deadline).toLocaleDateString([], { month: 'short', day: 'numeric' })}</p>
                   </div>
-                  <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest shrink-0 ${
-                    task.priority === 'high' ? 'bg-rose-500/20 text-rose-100 border border-rose-400/30' : 'bg-white/10 text-white/80 border border-white/20'
+                  <span className={`text-[10px] font-medium px-3 py-1.5 rounded-lg shrink-0 ${
+                    task.priority === 'high' ? 'bg-[#c97070]/10 text-[#c97070] border border-[#c97070]/15' : 'bg-white/[0.04] text-white/40 border border-white/[0.06]'
                   }`}>
                     {task.priority}
                   </span>

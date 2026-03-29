@@ -19,12 +19,12 @@ interface DashboardProps {
 type TabType = 'analytics' | 'quantum';
 
 const PIE_COLORS = {
-  mastery: '#34d399',
-  neutral: '#fbbf24',
-  struggle: '#f87171',
-  optimal: '#34d399',
-  high: '#f87171',
-  low: '#818cf8',
+  mastery: '#8baa6e',
+  neutral: '#c4b998',
+  struggle: '#c97070',
+  optimal: '#8baa6e',
+  high: '#c97070',
+  low: '#7a8aaa',
 };
 
 const GlassCard: React.FC<{ children: React.ReactNode; className?: string; blue?: boolean }> = ({ children, className = '', blue }) => (
@@ -37,10 +37,10 @@ const StatPill: React.FC<{ icon: React.ReactNode; label: string; value: string |
   <div className="figma-glass p-5 flex flex-col gap-2">
     <div className="flex items-center gap-2">
       {icon}
-      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/50">{label}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-white/30">{label}</span>
     </div>
-    <p className="text-3xl font-black text-white">{value}</p>
-    {sub && <p className="text-[10px] font-medium text-white/40">{sub}</p>}
+    <p className="text-2xl font-bold text-[#e8e4dc]">{value}</p>
+    {sub && <p className="text-[10px] font-medium text-white/25">{sub}</p>}
   </div>
 );
 
@@ -253,25 +253,25 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
   if (agents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center px-6">
-        <div className="w-24 h-24 figma-glass rounded-[2rem] flex items-center justify-center mb-8">
-          <GraduationCap size={48} className="text-white/40" />
+        <div className="w-20 h-20 figma-glass rounded-2xl flex items-center justify-center mb-6">
+          <GraduationCap size={40} className="text-white/20" />
         </div>
-        <h2 className="text-3xl font-black tracking-tight text-white">No Courses Yet</h2>
-        <p className="text-white/40 font-medium mt-3 max-w-sm">Add a subject and generate a roadmap to see your analytics here.</p>
+        <h2 className="text-2xl font-bold tracking-tight text-[#e8e4dc]">No Courses Yet</h2>
+        <p className="text-white/30 font-medium mt-2 max-w-sm text-sm">Add a subject and generate a roadmap to see your analytics here.</p>
       </div>
     );
   }
 
   const glassTooltipStyle = {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(26, 26, 30, 0.95)',
     backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '16px',
-    padding: '12px 16px',
-    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '12px',
+    padding: '10px 14px',
+    color: '#e8e4dc',
     fontSize: '12px',
-    fontWeight: 700,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+    fontWeight: 600,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
   };
 
   return (
@@ -279,24 +279,24 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
 
       {/* ── Tab Switcher ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <div className="figma-glass inline-flex p-1.5 gap-1.5">
+        <div className="figma-glass inline-flex p-1 gap-1">
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`px-5 py-2.5 rounded-[18px] text-sm font-bold transition-all duration-300 flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'analytics'
-                ? 'bg-white/20 text-white shadow-lg shadow-white/5'
-                : 'text-white/40 hover:text-white/70'
+                ? 'bg-white/[0.08] text-[#e8e4dc]'
+                : 'text-white/30 hover:text-white/50'
             }`}
           >
-            <BarChart3 size={16} />
+            <BarChart3 size={15} />
             Analytics
           </button>
           <button
             onClick={() => setActiveTab('quantum')}
-            className={`px-5 py-2.5 rounded-[18px] text-sm font-bold transition-all duration-300 flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
               activeTab === 'quantum'
-                ? 'bg-white/20 text-white shadow-lg shadow-white/5'
-                : 'text-white/40 hover:text-white/70'
+                ? 'bg-white/[0.08] text-[#e8e4dc]'
+                : 'text-white/30 hover:text-white/50'
             }`}
           >
             <Atom size={16} />
@@ -304,9 +304,9 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
           </button>
         </div>
         <div className="figma-glass px-4 py-2 flex items-center gap-2">
-          <Flame size={14} className="text-orange-300" />
-          <span className="text-sm font-black text-white">{formatTime(globalStats.totalFocus)}</span>
-          <span className="text-[9px] font-bold text-white/40 uppercase">focus</span>
+          <Flame size={14} className="text-[#c4b998]" />
+          <span className="text-sm font-semibold text-[#e8e4dc]">{formatTime(globalStats.totalFocus)}</span>
+          <span className="text-[9px] font-medium text-white/30">focus</span>
         </div>
       </div>
 
@@ -319,25 +319,25 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
           {/* Global Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatPill
-              icon={<Target size={16} className="text-blue-300" />}
+              icon={<Target size={16} className="text-[#c4b998]" />}
               label="Coverage"
               value={`${globalStats.coverage}%`}
               sub={`${globalStats.completedLessons}/${globalStats.totalLessons} lessons`}
             />
             <StatPill
-              icon={<CheckCircle2 size={16} className="text-emerald-300" />}
+              icon={<CheckCircle2 size={16} className="text-[#8baa6e]" />}
               label="Avg Quiz"
               value={`${globalStats.avgQuiz}%`}
               sub={`${globalStats.mastered} mastered topics`}
             />
             <StatPill
-              icon={<Brain size={16} className="text-violet-300" />}
+              icon={<Brain size={16} className="text-[#7a8aaa]" />}
               label="Cognitive"
               value={`${globalStats.optimalPct}%`}
               sub="optimal load sessions"
             />
             <StatPill
-              icon={<AlertTriangle size={16} className="text-amber-300" />}
+              icon={<AlertTriangle size={16} className="text-[#c97070]" />}
               label="Needs Work"
               value={globalStats.struggle + globalStats.neutral}
               sub={`${globalStats.struggle} struggling, ${globalStats.neutral} neutral`}
@@ -352,55 +352,55 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
                 {/* Subject Header */}
                 <button
                   onClick={() => setExpandedAgent(isExpanded ? null : stat.agent.id)}
-                  className="w-full p-6 md:p-8 flex items-center justify-between hover:bg-white/5 transition-colors"
+                  className="w-full p-5 md:p-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
                 >
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-400/30 to-violet-500/30 border border-white/20 flex items-center justify-center shadow-lg">
-                      <BookOpen size={24} className="text-white" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+                      <BookOpen size={20} className="text-[#c4b998]" />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-xl font-black tracking-tight text-white">{stat.agent.subject}</h3>
-                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">
+                      <h3 className="text-base font-bold tracking-tight text-[#e8e4dc]">{stat.agent.subject}</h3>
+                      <p className="text-[10px] font-medium text-white/30 mt-0.5">
                         {stat.agent.timeframe} · {stat.completed}/{stat.total} lessons · {formatTime(stat.focusMin)} focus
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-5">
-                    <div className="hidden md:flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                        <span className="text-xs font-black text-white/80">{stat.mastered}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-2.5">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#8baa6e]" />
+                        <span className="text-xs font-semibold text-white/50">{stat.mastered}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                        <span className="text-xs font-black text-white/80">{stat.neutral}</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#c4b998]" />
+                        <span className="text-xs font-semibold text-white/50">{stat.neutral}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                        <span className="text-xs font-black text-white/80">{stat.struggle}</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full bg-[#c97070]" />
+                        <span className="text-xs font-semibold text-white/50">{stat.struggle}</span>
                       </div>
                     </div>
 
                     {/* Coverage ring */}
-                    <div className="relative w-12 h-12">
+                    <div className="relative w-10 h-10">
                       <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                          fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
                         <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none" stroke="#818cf8" strokeWidth="3"
+                          fill="none" stroke="#c4b998" strokeWidth="3"
                           strokeDasharray={`${stat.coverage}, 100`} strokeLinecap="round" />
                       </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{stat.coverage}%</span>
+                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-[#e8e4dc]">{stat.coverage}%</span>
                     </div>
 
-                    <ChevronDown size={20} className={`text-white/30 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={18} className={`text-white/20 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </div>
                 </button>
 
                 {/* Expanded Content */}
                 {isExpanded && (
-                  <div className="border-t border-white/10 p-6 md:p-8 space-y-6 animate-in slide-in-from-top-4 duration-300">
+                  <div className="border-t border-white/[0.06] p-5 md:p-6 space-y-5 animate-in slide-in-from-top-4 duration-300">
 
                     {/* Mastery + Cognitive Split */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

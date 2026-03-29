@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { User, LearningAgent } from '../types';
 import { firebaseService } from '../services/firebaseService';
+import { LogOut, BookOpen, Clock, CheckCircle2, Target, Edit3, TrendingUp, Award } from 'lucide-react';
 
 interface ProfileProps {
   user: User;
@@ -12,15 +13,23 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user, agents, onLogout, onUpdateUser }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({
-    name: user.name
-  });
+  const [editData, setEditData] = useState({ name: user.name });
   const [isSaving, setIsSaving] = useState(false);
 
   const totalFocus = agents.reduce((acc, a) => acc + (a.total_focus_time || 0), 0);
-  const completedNodes = agents.reduce((acc, a) => 
-    acc + a.roadmap.reduce((sum, m) => sum + m.subtopics.filter(s => s.is_completed).length, 0), 0
+  const completedNodes = agents.reduce((acc, a) =>
+    acc + a.roadmap.reduce((sum, m) => sum + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0), 0
   );
+  const totalNodes = agents.reduce((acc, a) =>
+    acc + a.roadmap.reduce((sum, m) => sum + m.subtopics.filter(s => !s.is_review).length, 0), 0
+  );
+  const quizScores = agents.flatMap(a =>
+    a.roadmap.flatMap(m => m.subtopics.filter(s => s.is_completed && !s.is_review && typeof s.quiz_score === 'number').map(s => s.quiz_score!))
+  );
+  const avgQuiz = quizScores.length > 0 ? Math.round(quizScores.reduce((a, b) => a + b, 0) / quizScores.length) : 0;
+  const focusHrs = Math.floor(totalFocus / 3600);
+  const focusMins = Math.round((totalFocus % 3600) / 60);
+  const overallProgress = agents.length > 0 ? Math.round(agents.reduce((sum, a) => sum + a.progress, 0) / agents.length) : 0;
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -36,146 +45,130 @@ const Profile: React.FC<ProfileProps> = ({ user, agents, onLogout, onUpdateUser 
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-10 animate-in fade-in duration-500 pb-32 relative">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-indigo-500/10 to-transparent -z-10 rounded-[3rem] blur-3xl" />
-      <div className="absolute top-20 right-10 w-64 h-64 bg-fuchsia-500/10 blur-[100px] rounded-full -z-10 animate-float" />
-      
-      {/* Profile Header */}
-      <div className="flex flex-col md:flex-row items-center gap-8 figma-glass-blue p-10 md:p-12 rounded-[3rem] relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-        
-        <div className="relative z-10 w-36 h-36 rounded-full p-2 bg-gradient-to-br from-indigo-300 via-white/50 to-fuchsia-300 shadow-2xl animate-float">
-          <div className="w-full h-full bg-slate-900/40 backdrop-blur-xl rounded-full flex items-center justify-center text-white text-6xl font-black italic shadow-inner border border-white/30">
+    <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8 animate-in fade-in duration-500 pb-32">
+
+      {/* ── Profile Card ─────────────────────────────────────────── */}
+      <div className="figma-glass-blue p-8 md:p-10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#c4b998]/[0.04] rounded-full blur-[100px] translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#8baa6e]/[0.03] rounded-full blur-[80px] -translate-x-1/4 translate-y-1/4 pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start gap-8">
+          {/* Avatar */}
+          <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-[#c4b998] to-[#a89870] flex items-center justify-center text-[#111113] text-5xl font-bold shadow-xl shadow-[#c4b998]/15 flex-shrink-0">
             {user.name[0]?.toUpperCase() || 'U'}
           </div>
-        </div>
-        
-        <div className="relative z-10 flex-1 text-center md:text-left space-y-3">
-          {isEditing ? (
-            <div className="space-y-2">
-              <input 
-                className="text-4xl md:text-5xl font-black bg-white/10 backdrop-blur-md border border-white/30 rounded-2xl px-6 py-3 outline-none w-full text-white placeholder:text-white/40 focus:bg-white/20 focus:border-white/60 transition-all shadow-inner"
-                value={editData.name}
-                onChange={e => setEditData({...editData, name: e.target.value})}
-                placeholder="Your Name"
-              />
-            </div>
-          ) : (
-            <h2 className="text-4xl md:text-5xl font-black drop-shadow-lg text-white tracking-tight">{user.name}</h2>
-          )}
-          <div className="inline-block px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20 shadow-sm">
-            <p className="text-indigo-100 font-bold uppercase tracking-widest text-[10px] md:text-xs">
-              {user.email}
-            </p>
+
+          {/* Name & Info */}
+          <div className="flex-1 text-center md:text-left">
+            {isEditing ? (
+              <div className="w-full max-w-sm space-y-4 mx-auto md:mx-0">
+                <input
+                  className="w-full text-center md:text-left text-2xl font-bold bg-white/[0.06] border border-white/[0.1] rounded-xl px-5 py-3 outline-none text-[#e8e4dc] placeholder:text-white/20 focus:border-[#c4b998]/40 transition-all"
+                  value={editData.name}
+                  onChange={e => setEditData({...editData, name: e.target.value})}
+                  placeholder="Your Name"
+                  autoFocus
+                />
+                <div className="flex gap-3">
+                  <button onClick={handleSave} disabled={isSaving} className="flex-1 py-3 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-xl text-sm font-semibold disabled:opacity-50 transition-all">
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button onClick={() => { setIsEditing(false); setEditData({ name: user.name }); }} className="flex-1 py-3 bg-white/[0.04] text-white/40 border border-white/[0.08] rounded-xl text-sm font-medium hover:bg-white/[0.06] transition-all">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 justify-center md:justify-start">
+                  <h2 className="text-3xl md:text-4xl font-bold text-[#e8e4dc] tracking-tight">{user.name}</h2>
+                  <button onClick={() => setIsEditing(true)} className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white/25 hover:text-[#c4b998] hover:border-[#c4b998]/20 transition-all">
+                    <Edit3 size={14} />
+                  </button>
+                </div>
+                <p className="text-white/30 text-base">{user.email}</p>
+
+                {/* Overall progress bar */}
+                <div className="flex items-center gap-3 mt-4 max-w-xs mx-auto md:mx-0">
+                  <div className="flex-1 h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${overallProgress}%`,
+                        background: overallProgress === 100 ? 'linear-gradient(90deg, #8baa6e, #a8c98a)' : 'linear-gradient(90deg, #c4b998, #d4c9a8)'
+                      }}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-white/40">{overallProgress}% overall</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
-        {!isEditing && (
-          <button onClick={() => setIsEditing(true)} className="relative z-10 px-8 py-4 bg-white/10 border border-white/30 hover:bg-white hover:text-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all duration-300 shadow-xl backdrop-blur-md flex items-center gap-2 group/edit">
-            <span className="opacity-70 group-hover/edit:opacity-100">✏️</span> Edit Profile
-          </button>
-        )}
       </div>
 
-      {isEditing && (
-        <div className="flex flex-col sm:flex-row gap-4 animate-in slide-in-from-top-4 duration-300">
-          <button onClick={handleSave} disabled={isSaving} className="flex-1 py-4 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-1 transition-all border border-white/20">
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button onClick={() => setIsEditing(false)} className="flex-1 py-4 bg-white/5 backdrop-blur-sm text-white border border-white/20 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all hover:-translate-y-1">
-            Cancel
-          </button>
+      {/* ── Stats Grid ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { icon: BookOpen, label: 'Courses', value: agents.length, color: '#c4b998' },
+          { icon: CheckCircle2, label: 'Completed', value: `${completedNodes}/${totalNodes}`, color: '#8baa6e' },
+          { icon: Target, label: 'Avg Quiz', value: `${avgQuiz}%`, color: '#7a9ec4' },
+          { icon: Clock, label: 'Focus Time', value: focusHrs > 0 ? `${focusHrs}h ${focusMins}m` : `${focusMins}m`, color: '#d4a574' },
+        ].map((stat, i) => (
+          <div key={i} className="figma-glass p-5 md:p-6 text-center space-y-3 hover:bg-white/[0.06] transition-all group">
+            <div className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center transition-all group-hover:scale-110" style={{ backgroundColor: `${stat.color}12`, border: `1px solid ${stat.color}18` }}>
+              <stat.icon size={22} style={{ color: stat.color }} />
+            </div>
+            <p className="text-2xl md:text-3xl font-bold text-[#e8e4dc]">{stat.value}</p>
+            <p className="text-xs font-medium text-white/30">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Courses List ─────────────────────────────────────────── */}
+      {agents.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-base font-semibold text-white/40 px-1">My Courses</h3>
+          <div className="space-y-3">
+            {agents.map(a => {
+              const total = a.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => !s.is_review).length, 0);
+              const done = a.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0);
+              return (
+                <div key={a.id} className="figma-glass p-5 md:p-6 flex items-center gap-5 hover:bg-white/[0.06] transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-base font-bold text-[#c4b998] flex-shrink-0">
+                    {a.subject[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-base text-[#e8e4dc] truncate">{a.subject}</p>
+                      <span className="text-sm font-semibold text-white/40 ml-3 flex-shrink-0">{a.progress}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${a.progress}%`,
+                          background: a.progress === 100 ? 'linear-gradient(90deg, #8baa6e, #a8c98a)' : 'linear-gradient(90deg, #c4b998, #d4c9a8)'
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-white/20 mt-2">{done}/{total} lessons &middot; {a.timeframe}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-        <div className="figma-glass p-8 md:p-10 rounded-[3rem] text-white hover:shadow-2xl hover:bg-white/10 transition-all duration-500 border border-white/20 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-indigo-400/30 transition-colors" />
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-indigo-200 mb-8 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /> Study Stats
-          </h3>
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <p className="text-5xl font-black italic bg-clip-text text-transparent bg-gradient-to-br from-white to-indigo-200 flex items-baseline gap-1">
-                {Math.floor(totalFocus / 60)}<span className="text-2xl not-italic text-indigo-300">h</span> 
-                {totalFocus % 60}<span className="text-xl not-italic text-indigo-300">m</span>
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200/70">Focus Time</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-5xl font-black italic bg-clip-text text-transparent bg-gradient-to-br from-white to-violet-200">{completedNodes}</p>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-200/70">Lessons Done</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="figma-glass p-8 md:p-10 rounded-[3rem] text-white hover:shadow-2xl hover:bg-white/10 transition-all duration-500 border border-white/20 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/20 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-violet-400/30 transition-colors" />
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-violet-200 mb-8 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" /> Learning Journey
-          </h3>
-          <div className="flex items-end gap-3">
-            <p className="text-6xl font-black italic text-white leading-none">{agents.length}</p>
-            <p className="text-lg font-bold text-violet-200/80 mb-1 leading-snug">Active<br/>Subjects</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Subjects Section */}
-      <div className="space-y-8 relative">
-        <h3 className="text-2xl font-black text-white px-2 flex items-center gap-3">
-          My Subjects <span className="bg-white/20 text-white text-xs py-1 px-3 rounded-full font-bold">{agents.length}</span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          {agents.map((a, i) => (
-            <div key={a.id} className="group relative p-6 md:p-8 figma-glass border border-white/20 rounded-[2.5rem] hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1 hover:border-white/40 transition-all duration-300 overflow-hidden">
-              {/* Subtle gradient background based on index */}
-              <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500 bg-gradient-to-br ${i % 2 === 0 ? 'from-indigo-400 to-violet-400' : 'from-violet-400 to-fuchsia-400'}`} />
-              
-              <div className="relative z-10 flex items-center gap-6">
-                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-2xl font-black text-white/70 group-hover:bg-white group-hover:text-indigo-600 group-hover:scale-110 transition-all duration-300 shadow-inner border border-white/20">
-                  {a.subject[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <p className="font-black text-xl text-white group-hover:text-white transition-colors truncate">{a.subject}</p>
-                  
-                  {/* Custom Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                      <span className="text-indigo-200">Progress</span>
-                      <span className="text-white">{a.progress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-black/20 rounded-full overflow-hidden border border-white/10">
-                      <div 
-                        className="h-full bg-gradient-to-r from-indigo-400 to-violet-400 rounded-full relative"
-                        style={{ width: `${a.progress}%` }}
-                      >
-                        <div className="absolute inset-0 bg-white/30 animate-pulse" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* Logout Area */}
-      <div className="pt-8">
-        <button 
-          onClick={onLogout} 
-          className="w-full relative group overflow-hidden py-5 px-8 rounded-3xl text-[11px] font-black uppercase tracking-widest text-rose-300 transition-all hover:text-white"
+      {/* ── Account Actions ──────────────────────────────────────── */}
+      <div className="pt-3">
+        <button
+          onClick={onLogout}
+          className="w-full py-4 rounded-xl text-sm font-medium text-white/25 bg-white/[0.02] border border-white/[0.06] hover:bg-rose-500/8 hover:text-rose-400/70 hover:border-rose-500/15 transition-all flex items-center justify-center gap-2.5"
         >
-          <div className="absolute inset-0 bg-rose-500/10 border-2 border-rose-500/30 rounded-3xl group-hover:bg-rose-500 group-hover:border-rose-500 transition-all duration-300 backdrop-blur-sm" />
-          <span className="relative z-10 flex items-center justify-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Log Out Account
-          </span>
+          <LogOut size={16} />
+          Sign Out
         </button>
       </div>
     </div>

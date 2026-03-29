@@ -523,5 +523,55 @@
       }
     ],
     "created_at": "2026-03-24T07:51:11.114Z"
+  },
+  {
+    "id": 1774460079481,
+    "user_id": "1a13e598df0eb0f9518916a9",
+    "subject": "quantum computing",
+    "topic": "History of Quantum Computing",
+    "version": 1,
+    "videos": [
+      {
+        "title": "Quantum Computing Explained by a Retired Microsoft Engineer",
+        "url": "https://www.youtube.com/watch?v=IzGJw6daRTw",
+        "description": "Dave Plummer explains the basics of Quantum Computing (superposition, entanglement, qubits, error correction, Grover's ..."
+      },
+      {
+        "title": "A beginner&#39;s guide to quantum computing | Shohini Ghose",
+        "url": "https://www.youtube.com/watch?v=QuR969uMICM",
+        "description": "A quantum computer isn't just a more powerful version of the computers we use today; it's something else entirely, based on ..."
+      },
+      {
+        "title": "What is Quantum Computing?",
+        "url": "https://www.youtube.com/watch?v=lt4OsgmUTGI",
+        "description": "Learn more about Quantum Computing → https://ibm.biz/BdPFBu What is a Quantum Computer? How is it different from traditional ..."
+      }
+    ],
+    "created_at": "2026-03-25T17:34:39.481Z"
+  },
+  {
+    "id": 1774815379981,
+    "user_id": "1a13e598df0eb0f9518916a9",
+    "subject": "calculus",
+    "topic": "Limits Basics",
+    "version": 1,
+    "videos": [
+      {
+        "title": "3 WAYS TO SOLVE LIMITS",
+        "url": "https://www.youtube.com/watch?v=PuVuNRqsNW0",
+        "description": "Solving limits is a key component of any Calculus 1 course and when the x value is approaching a finite number (i.e. not infinity), ..."
+      },
+      {
+        "title": "Calculus - The limit of a function",
+        "url": "https://www.youtube.com/watch?v=h_Rf_2OeSJU",
+        "description": "This video covers the limit of a function. The focus is on the behavior of a function and what it is approaching. Remember this is ..."
+      },
+      {
+        "title": "Limits and Limit Laws in Calculus",
+        "url": "https://www.youtube.com/watch?v=wK8WuTEc0ns",
+        "description": "In introducing the concept of differentiation, we investigated the behavior of some parameter in the limit of something else ..."
+      }
+    ],
+    "created_at": "2026-03-29T20:16:19.981Z"
   }
 ]

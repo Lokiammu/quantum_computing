@@ -13,7 +13,7 @@ import FinalAssessmentView from './components/FinalAssessmentView';
 import AbstractBackground from './components/AbstractBackground';
 import About from './components/About';
 import Navbar from './components/Navbar';
-import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon, Lock, CheckCircle2, Trash2 } from 'lucide-react';
+import { Trophy, Sparkles, Home, Calendar, Zap, User as UserIcon, Lock, CheckCircle2, Trash2, Plus, BrainCircuit } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<'home' | 'planner' | 'stats' | 'me'>('home');
@@ -170,7 +170,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     googleRenderedRef.current = false;
-  }, [authStep, isAuthMode]);
+  }, [authStep, isAuthMode, showLanding]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,7 +257,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!googleClientId) return;
     if (!googleReady) return;
-    if (authStep !== 'auth' || isAuthMode !== 'login') return;
+    if (authStep !== 'auth') return;
+    if (showLanding) return;
     if (!googleButtonRef.current) return;
     if (googleRenderedRef.current) return;
 
@@ -282,13 +283,15 @@ const App: React.FC = () => {
 
     googleButtonRef.current.innerHTML = '';
     googleAny.accounts.id.renderButton(googleButtonRef.current, {
-      theme: 'outline',
+      theme: 'filled_blue',
       size: 'large',
-      width: 360
+      shape: 'rectangular',
+      text: 'continue_with',
+      width: 340
     });
 
     googleRenderedRef.current = true;
-  }, [authStep, googleClientId, googleReady, isAuthMode]);
+  }, [authStep, googleClientId, googleReady, isAuthMode, showLanding]);
 
   const handleCreateAgent = async () => {
     if (!currentUser || !newAgent.name) return;
@@ -621,7 +624,7 @@ const App: React.FC = () => {
           <div className="text-center pb-16">
             <button
               onClick={() => setShowLanding(false)}
-              className="px-14 py-6 bg-white text-[#0d62bb] rounded-[2rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-50 hover:-translate-y-1 active:scale-95 transition-all text-lg"
+              className="px-14 py-6 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-2xl font-bold tracking-wide shadow-2xl shadow-[#c4b998]/20 hover:-translate-y-1 active:scale-95 transition-all text-lg"
             >
               Get Started
             </button>
@@ -635,110 +638,128 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen figma-bg flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
         <AbstractBackground />
+        {/* Subtle ambient glows */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#c4b998]/[0.03] rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-[#8baa6e]/[0.02] rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="w-full max-w-[420px] relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          
+        <div className="w-full max-w-[400px] relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+          {/* Logo above card */}
+          <div className="flex justify-center mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c4b998] to-[#a89870] flex items-center justify-center shadow-lg shadow-[#c4b998]/10">
+                <BrainCircuit size={20} className="text-[#111113]" />
+              </div>
+              <span className="text-xl font-bold text-[#e8e4dc] tracking-tight">SmartLearn</span>
+            </div>
+          </div>
+
           {authStep === 'auth' && (
-            <div className="figma-glass p-8 sm:p-10 flex flex-col items-center shadow-2xl">
-              
-              <div className="w-full text-left pt-2">
-                <h3 className="text-[28px] font-semibold text-white mb-6 leading-tight">
-                  {isAuthMode === 'login' ? 'Login' : 'Join Us'}
+            <div className="bg-[#1a1a1e] rounded-2xl p-7 sm:p-8 border border-white/[0.08] shadow-2xl shadow-black/40">
+
+              <div className="w-full">
+                <h3 className="text-2xl font-bold text-[#e8e4dc] mb-1">
+                  {isAuthMode === 'login' ? 'Welcome back' : 'Create account'}
                 </h3>
-                
+                <p className="text-sm text-white/30 mb-6">
+                  {isAuthMode === 'login' ? 'Sign in to continue learning' : 'Start your learning journey'}
+                </p>
+
                 <form className="space-y-4" onSubmit={handleAuth}>
                   {isAuthMode === 'register' && (
-                     <div className="space-y-1">
-                        <label className="text-white text-sm font-medium">Full Name</label>
-                        <input 
-                          type="text" 
-                          placeholder="Your Name" 
+                     <div className="space-y-1.5">
+                        <label className="text-white/40 text-xs font-medium ml-0.5">Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="Your Name"
                           className="figma-input"
-                          value={authData.name} 
-                          onChange={e => setAuthData({...authData, name: e.target.value})} 
-                          required 
+                          value={authData.name}
+                          onChange={e => setAuthData({...authData, name: e.target.value})}
+                          required
                         />
                      </div>
                   )}
-                  
-                  <div className="space-y-1">
-                    <label className="text-white text-sm font-medium">Email</label>
-                    <input 
-                      type="email" 
-                      placeholder="username@gmail.com" 
+
+                  <div className="space-y-1.5">
+                    <label className="text-white/40 text-xs font-medium ml-0.5">Email</label>
+                    <input
+                      type="email"
+                      placeholder="you@email.com"
                       className="figma-input"
-                      value={authData.email} 
-                      onChange={e => setAuthData({...authData, email: e.target.value})} 
-                      required 
+                      value={authData.email}
+                      onChange={e => setAuthData({...authData, email: e.target.value})}
+                      required
                     />
                   </div>
-                  
-                  <div className="space-y-1">
-                    <label className="text-white text-sm font-medium">Password</label>
-                    <div className="relative">
-                      <input 
-                        type="password" 
-                        placeholder="Password" 
-                        className="figma-input pr-10"
-                        value={authData.password} 
-                        onChange={e => setAuthData({...authData, password: e.target.value})} 
-                        required 
-                      />
-                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#999] hover:text-[#555] transition-colors focus:outline-none">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                      </button>
-                    </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-white/40 text-xs font-medium ml-0.5">Password</label>
+                    <input
+                      type="password"
+                      placeholder="Enter password"
+                      className="figma-input"
+                      value={authData.password}
+                      onChange={e => setAuthData({...authData, password: e.target.value})}
+                      required
+                    />
                   </div>
-                  
+
                   {isAuthMode === 'login' && (
-                    <div className="flex justify-start pt-1">
+                    <div className="flex justify-end">
                       <button
                         type="button"
                         onClick={() => { setForgotEmail(authData.email || ''); setAuthStep('forgotEmail'); }}
-                        className="text-white/90 hover:text-white text-sm font-medium transition-colors"
+                        className="text-[#c4b998]/70 hover:text-[#c4b998] text-xs font-medium transition-colors"
                       >
-                        Forgot Password?
+                        Forgot password?
                       </button>
                     </div>
                   )}
 
-                  <div className="pt-2">
-                    <button 
-                      type="submit" 
+                  <div className="pt-1">
+                    <button
+                      type="submit"
                       disabled={authLoading}
                       className="figma-btn"
                     >
-                      {authLoading ? 'Verifying...' : isAuthMode === 'register' ? 'Register' : 'Sign in'}
+                      {authLoading ? 'Verifying...' : isAuthMode === 'register' ? 'Create Account' : 'Sign In'}
                     </button>
                   </div>
                 </form>
 
-                <div className="mt-8 text-center pt-2">
-                  <p className="text-white/90 text-sm mb-5 font-medium">or continue with</p>
-                  <div className="flex justify-center gap-4">
-                     <div className="relative group overflow-hidden rounded-lg">
-                       <button type="button" className="figma-social-btn">
-                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                         </svg>
-                       </button>
-                       {isAuthMode === 'login' && (
-                         <div className="absolute inset-0 opacity-0 z-10 overflow-hidden cursor-pointer" title="Sign in with Google">
-                           <div ref={googleButtonRef} className="-ml-2 -mt-2 scale-[2] origin-top-left" />
-                         </div>
-                       )}
-                     </div>
+                <div className="mt-6 text-center">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex-1 h-px bg-white/[0.06]" />
+                    <span className="text-white/20 text-xs">or</span>
+                    <div className="flex-1 h-px bg-white/[0.06]" />
+                  </div>
+                  {/* Google Sign-In: show SDK button on both login and register pages */}
+                  <div className="flex justify-center">
+                    {googleClientId ? (
+                      <div ref={googleButtonRef} className="flex justify-center min-h-[44px]" />
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/50 text-sm font-medium flex items-center justify-center gap-3 opacity-50 cursor-not-allowed"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                        </svg>
+                        Continue with Google
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-8 text-center pt-2 pb-2">
-                  <p className="text-white/90 text-sm font-medium">
-                    {isAuthMode === 'register' ? "Already have an account?" : "Don't have an account yet?"}{' '}
-                    <button type="button" className="text-white font-bold hover:underline" onClick={() => setIsAuthMode(isAuthMode === 'login' ? 'register' : 'login')}>
-                      {isAuthMode === 'register' ? "Sign in" : "Register for free"}
+                <div className="mt-6 text-center">
+                  <p className="text-white/30 text-sm">
+                    {isAuthMode === 'register' ? "Already have an account?" : "Don't have an account?"}{' '}
+                    <button type="button" className="text-[#c4b998] font-semibold hover:text-[#e8e4dc] transition-colors" onClick={() => setIsAuthMode(isAuthMode === 'login' ? 'register' : 'login')}>
+                      {isAuthMode === 'register' ? "Sign in" : "Register"}
                     </button>
                   </p>
                 </div>
@@ -748,15 +769,15 @@ const App: React.FC = () => {
 
 
           {authStep === 'forgotEmail' && (
-            <form className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5 text-left" onSubmit={handleSendResetOtp}>
-              <div className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Reset Password</p>
-                <p className="text-sm font-bold text-slate-700">Enter your email to receive a reset OTP.</p>
+            <form className="bg-[#1a1a1e] p-7 sm:p-8 rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/40 space-y-5 text-left" onSubmit={handleSendResetOtp}>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-[#e8e4dc]">Reset Password</h3>
+                <p className="text-sm text-white/30">Enter your email to receive a reset code.</p>
               </div>
               <input
                 type="email"
                 placeholder="Email Address"
-                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold focus:border-indigo-500 transition-colors"
+                className="figma-input"
                 value={forgotEmail}
                 onChange={e => setForgotEmail(e.target.value)}
                 required
@@ -764,26 +785,26 @@ const App: React.FC = () => {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                className="figma-btn"
               >
                 {authLoading ? 'Sending...' : 'Send OTP'}
               </button>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <button type="button" onClick={() => { setAuthStep('auth'); setIsAuthMode('login'); }} className="underline hover:text-slate-600">Back to login</button>
-              </p>
+              <button type="button" onClick={() => { setAuthStep('auth'); setIsAuthMode('login'); }} className="text-xs text-[#c4b998]/60 hover:text-[#c4b998] transition-colors">
+                Back to login
+              </button>
             </form>
           )}
 
           {authStep === 'resetOtp' && (
-            <form className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5 text-left" onSubmit={handleVerifyResetOtp}>
-              <div className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Verify Reset OTP</p>
-                <p className="text-sm font-bold text-slate-700">We sent a 6-digit code to <span className="font-black">{forgotEmail}</span></p>
+            <form className="bg-[#1a1a1e] p-7 sm:p-8 rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/40 space-y-5 text-left" onSubmit={handleVerifyResetOtp}>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-[#e8e4dc]">Verify Code</h3>
+                <p className="text-sm text-white/30">We sent a 6-digit code to <span className="text-[#e8e4dc]">{forgotEmail}</span></p>
               </div>
               <input
                 inputMode="numeric"
                 placeholder="Enter OTP"
-                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-black tracking-widest text-center text-lg focus:border-indigo-500 transition-colors"
+                className="figma-input text-center text-lg tracking-widest"
                 value={resetOtpCode}
                 onChange={e => setResetOtpCode(e.target.value)}
                 required
@@ -791,28 +812,28 @@ const App: React.FC = () => {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                className="figma-btn"
               >
                 {authLoading ? 'Verifying...' : 'Verify OTP'}
               </button>
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                <button type="button" onClick={() => setAuthStep('forgotEmail')} className="underline hover:text-slate-600">Back</button>
-                <button type="button" onClick={async () => { try { setAuthLoading(true); await authApi.sendOtp(forgotEmail, 'reset'); alert('OTP resent.'); } catch (e: any) { alert(e.message || 'Failed to resend OTP.'); } finally { setAuthLoading(false); } }} className="underline hover:text-slate-600">Resend</button>
+              <div className="flex justify-between text-xs">
+                <button type="button" onClick={() => setAuthStep('forgotEmail')} className="text-[#c4b998]/60 hover:text-[#c4b998] transition-colors">Back</button>
+                <button type="button" onClick={async () => { try { setAuthLoading(true); await authApi.sendOtp(forgotEmail, 'reset'); alert('OTP resent.'); } catch (e: any) { alert(e.message || 'Failed to resend OTP.'); } finally { setAuthLoading(false); } }} className="text-[#c4b998]/60 hover:text-[#c4b998] transition-colors">Resend</button>
               </div>
             </form>
           )}
 
           {authStep === 'resetPassword' && (
-            <form className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-5 text-left" onSubmit={handleDoResetPassword}>
-              <div className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Set New Password</p>
-                <p className="text-sm font-bold text-slate-700">Choose a new password for <span className="font-black">{forgotEmail}</span></p>
+            <form className="bg-[#1a1a1e] p-7 sm:p-8 rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/40 space-y-5 text-left" onSubmit={handleDoResetPassword}>
+              <div className="space-y-1">
+                <h3 className="text-xl font-bold text-[#e8e4dc]">New Password</h3>
+                <p className="text-sm text-white/30">Choose a new password for <span className="text-[#e8e4dc]">{forgotEmail}</span></p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <input
                   type="password"
                   placeholder="New Password"
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold focus:border-indigo-500 transition-colors"
+                  className="figma-input"
                   value={resetPassword}
                   onChange={e => setResetPassword(e.target.value)}
                   required
@@ -820,7 +841,7 @@ const App: React.FC = () => {
                 <input
                   type="password"
                   placeholder="Confirm New Password"
-                  className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none font-bold focus:border-indigo-500 transition-colors"
+                  className="figma-input"
                   value={resetPasswordConfirm}
                   onChange={e => setResetPasswordConfirm(e.target.value)}
                   required
@@ -829,13 +850,13 @@ const App: React.FC = () => {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                className="figma-btn"
               >
                 {authLoading ? 'Resetting...' : 'Reset Password'}
               </button>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <button type="button" onClick={() => { setAuthStep('auth'); setIsAuthMode('login'); }} className="underline hover:text-slate-600">Back to login</button>
-              </p>
+              <button type="button" onClick={() => { setAuthStep('auth'); setIsAuthMode('login'); }} className="text-xs text-[#c4b998]/60 hover:text-[#c4b998] transition-colors">
+                Back to login
+              </button>
             </form>
           )}
         </div>
@@ -846,97 +867,146 @@ const App: React.FC = () => {
   const currentAgent = agents.find(a => a.id === (activeSession?.agentId || selectedAgentId));
 
   return (
-    <div className="min-h-screen figma-bg flex flex-col text-white pb-32 md:pb-0 relative overflow-x-hidden">
+    <div className="min-h-screen figma-bg flex flex-col text-[#e8e4dc] pb-32 md:pb-0 relative overflow-x-hidden">
       <AbstractBackground />
-      {/* Desktop Top Header (Hidden on Mobile) */}
-      <Navbar 
-        currentUser={currentUser} 
-        activeScreen={activeScreen} 
-        setActiveScreen={setActiveScreen} 
-        setSelectedAgentId={setSelectedAgentId} 
-        onLogout={() => setCurrentUser(null)} 
+      {/* Desktop Sidebar + Top Bar */}
+      <Navbar
+        currentUser={currentUser}
+        activeScreen={activeScreen}
+        setActiveScreen={setActiveScreen}
+        setSelectedAgentId={setSelectedAgentId}
+        onLogout={() => setCurrentUser(null)}
       />
 
-      <main className="flex-1 overflow-y-auto pb-32">
+      <main className="flex-1 overflow-y-auto pb-32 md:pl-[72px]">
         {activeScreen === 'home' && (
-          <div className="p-6 max-w-5xl mx-auto space-y-10 animate-in fade-in duration-500">
+          <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
             {!selectedAgentId ? (
-              <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
-                   <div className="text-white">
-                      <h2 className="text-3xl font-black">My Subjects</h2>
-                      <p className="text-white/70 font-medium">Continue your learning journey.</p>
-                   </div>
-                   <button onClick={() => setIsAgentModalOpen(true)} className="px-8 py-4 bg-white text-[#0d62bb] rounded-2xl font-black shadow-lg hover:bg-slate-50 transition-all">New Subject</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {agents.map(agent => (
-                    <div key={agent.id} onClick={() => setSelectedAgentId(agent.id)} className="group figma-glass p-8 transition-all cursor-pointer hover:-translate-y-1 relative">
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent.id); }}
-                        className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-white/0 hover:bg-rose-500/20 flex items-center justify-center text-white/20 hover:text-rose-300 transition-all opacity-0 group-hover:opacity-100 border border-transparent hover:border-rose-400/30"
-                        title="Delete subject"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="flex justify-between items-center mb-10 text-white">
-                        <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center font-black text-2xl group-hover:bg-white group-hover:text-[#0d62bb] transition-all">
-                           {agent.subject[0]}
-                        </div>
-                        <div className="text-right">
-                           <div className="text-3xl font-black">{agent.progress}%</div>
-                           <div className="text-[9px] font-bold text-white/50 uppercase tracking-widest">Progress</div>
-                        </div>
-                      </div>
-                      <h3 className="text-xl font-black text-white">{agent.subject}</h3>
-                      <p className="text-xs font-bold text-white/70 mt-2">{agent.timeframe} Duration</p>
+              <div className="space-y-8">
+                {/* Hero welcome card */}
+                <div className="figma-glass-blue p-8 md:p-10 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-[#c4b998]/[0.06] rounded-full blur-[80px] translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+                  <div className="relative z-10">
+                    <p className="text-white/40 text-sm font-medium mb-1">Welcome back,</p>
+                    <h2 className="text-3xl md:text-4xl font-bold text-[#e8e4dc] tracking-tight">{currentUser?.name || 'Learner'}</h2>
+                    <p className="text-white/40 text-sm mt-2">Continue where you left off.</p>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-6 mt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-[#e8e4dc]">{agents.length}</p>
+                      <p className="text-[10px] text-white/30 font-medium mt-0.5">Courses</p>
                     </div>
-                  ))}
+                    <div className="w-px h-8 bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-[#e8e4dc]">
+                        {agents.length > 0 ? Math.round(agents.reduce((sum, a) => sum + a.progress, 0) / agents.length) : 0}%
+                      </p>
+                      <p className="text-[10px] text-white/30 font-medium mt-0.5">Avg Progress</p>
+                    </div>
+                    <div className="w-px h-8 bg-white/10" />
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-[#e8e4dc]">
+                        {agents.reduce((sum, a) => sum + a.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0), 0)}
+                      </p>
+                      <p className="text-[10px] text-white/30 font-medium mt-0.5">Completed</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subject header row */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-[#e8e4dc]">My Courses</h3>
+                  <button onClick={() => setIsAgentModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-[#c4b998]/10 hover:-translate-y-0.5 transition-all">
+                    <Plus size={16} /> New Course
+                  </button>
+                </div>
+
+                {/* Subject cards grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {agents.map(agent => {
+                    const totalLessons = agent.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => !s.is_review).length, 0);
+                    const completedLessons = agent.roadmap.reduce((acc, m) => acc + m.subtopics.filter(s => s.is_completed && !s.is_review).length, 0);
+                    return (
+                      <div key={agent.id} onClick={() => setSelectedAgentId(agent.id)} className="group figma-glass p-6 transition-all cursor-pointer hover:bg-white/[0.06] hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 relative">
+                        {/* Delete button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent.id); }}
+                          className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-transparent hover:bg-rose-500/15 flex items-center justify-center text-white/15 hover:text-rose-400 transition-all opacity-0 group-hover:opacity-100"
+                          title="Delete subject"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+
+                        {/* Subject icon */}
+                        <div className="w-12 h-12 rounded-2xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-lg font-bold text-[#c4b998] mb-5 group-hover:bg-[#c4b998]/10 group-hover:border-[#c4b998]/20 transition-all">
+                          {agent.subject[0]}
+                        </div>
+
+                        <h3 className="text-base font-bold text-[#e8e4dc] mb-1">{agent.subject}</h3>
+                        <p className="text-xs text-white/30 mb-5">{agent.timeframe} &middot; {totalLessons} lessons</p>
+
+                        {/* Progress bar */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-700"
+                              style={{
+                                width: `${agent.progress}%`,
+                                background: agent.progress === 100 ? 'linear-gradient(90deg, #8baa6e, #a8c98a)' : 'linear-gradient(90deg, #c4b998, #d4c9a8)'
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs font-semibold text-white/40 min-w-[36px] text-right">{agent.progress}%</span>
+                        </div>
+
+                        {/* Lessons completed */}
+                        <p className="text-[10px] text-white/20 mt-3">{completedLessons}/{totalLessons} completed</p>
+                      </div>
+                    );
+                  })}
                   {agents.length === 0 && (
-                    <div className="md:col-span-3 py-20 flex flex-col items-center justify-center border-2 border-dashed rounded-3xl border-white/20 text-white/50 bg-white/5 backdrop-blur-sm">
-                       <p className="text-lg font-bold">No subjects yet. Start your first roadmap!</p>
+                    <div className="md:col-span-3 py-20 flex flex-col items-center justify-center border border-dashed rounded-2xl border-white/10 text-white/30 bg-white/[0.02]">
+                       <Plus size={32} className="mb-3 text-white/15" />
+                       <p className="text-sm font-medium">No courses yet. Add your first one!</p>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="max-w-4xl mx-auto space-y-10 pb-24">
-                <button onClick={() => setSelectedAgentId(null)} className="text-xs font-bold text-indigo-200 hover:text-white hover:-translate-x-1 transition-all inline-flex items-center gap-1">
-                  <span className="text-lg leading-none">←</span> Back to Subjects
+              <div className="max-w-4xl mx-auto space-y-8 pb-24">
+                <button onClick={() => setSelectedAgentId(null)} className="text-xs font-medium text-white/40 hover:text-[#e8e4dc] hover:-translate-x-1 transition-all inline-flex items-center gap-1.5">
+                  <span className="text-base leading-none">←</span> Back to Courses
                 </button>
 
                 {/* Subject Header */}
-                <div className="figma-glass-blue p-10 md:p-12 rounded-[3rem] relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2" />
+                <div className="figma-glass-blue p-8 md:p-10 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-[#c4b998]/[0.04] blur-[80px] rounded-full translate-x-1/3 -translate-y-1/3 pointer-events-none" />
                   <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200/70 mb-2">Learning Roadmap</p>
-                      <h2 className="text-4xl md:text-5xl font-black tracking-tight text-white">{currentAgent?.subject}</h2>
-                      <p className="text-white/50 font-bold text-sm mt-2">Daily Roadmap Optimized by SmartLearn AI</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 mb-2">Learning Roadmap</p>
+                      <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-[#e8e4dc]">{currentAgent?.subject}</h2>
+                      <p className="text-white/30 font-medium text-sm mt-2">Personalized by SmartLearn AI</p>
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="text-right">
-                        <p className="text-4xl font-black text-white">{currentAgent?.progress}%</p>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-indigo-200/60">Progress</p>
+                        <p className="text-3xl font-bold text-[#e8e4dc]">{currentAgent?.progress}%</p>
+                        <p className="text-[10px] font-medium text-white/30">Progress</p>
                       </div>
                       {currentAgent?.progress === 100 && (
-                        <div className="px-5 py-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl flex items-center gap-2 border border-emerald-400/30">
-                          <Sparkles className="text-emerald-300" size={18}/>
-                          <span className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Ready for Final</span>
+                        <div className="px-4 py-2.5 bg-[#8baa6e]/15 rounded-xl flex items-center gap-2 border border-[#8baa6e]/20">
+                          <Sparkles className="text-[#8baa6e]" size={16}/>
+                          <span className="text-[10px] font-semibold text-[#8baa6e]">Ready for Final</span>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-14">
+                <div className="space-y-10">
                    {(() => {
-                     // Determine the current active day: smallest day_number among uncompleted non-review subtopics
                      const allSubs = currentAgent?.roadmap.flatMap(m => m.subtopics) || [];
                      const uncompletedDays = allSubs.filter(s => !s.is_completed && !s.is_review).map(s => s.day_number);
                      const currentDay = uncompletedDays.length > 0 ? Math.min(...uncompletedDays) : Infinity;
-                     // Assign a global sequential index to each unique day_number for display
                      const uniqueDays = [...new Set(allSubs.filter(s => !s.is_review).map(s => s.day_number))].sort((a, b) => a - b);
                      const dayLabel = (d: number) => {
                        const idx = uniqueDays.indexOf(d);
@@ -951,31 +1021,31 @@ const App: React.FC = () => {
                        const isModuleDone = modPct === 100;
 
                        return (
-                         <div key={mod.id} className="space-y-6">
-                            {/* Module header with progress */}
-                            <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black border ${
+                         <div key={mod.id} className="space-y-5">
+                            {/* Module header */}
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold border ${
                                 isModuleDone
-                                  ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'
-                                  : 'bg-white/10 border-white/20 text-white/70'
+                                  ? 'bg-[#8baa6e]/15 border-[#8baa6e]/20 text-[#8baa6e]'
+                                  : 'bg-white/[0.05] border-white/[0.08] text-white/50'
                               }`}>
-                                {isModuleDone ? <CheckCircle2 size={20} /> : (currentAgent!.roadmap.indexOf(mod) + 1)}
+                                {isModuleDone ? <CheckCircle2 size={18} /> : (currentAgent!.roadmap.indexOf(mod) + 1)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-black text-xl text-white truncate">{mod.title}</h4>
-                                <div className="flex items-center gap-3 mt-1.5">
-                                  <div className="flex-1 max-w-[200px] bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                <h4 className="font-bold text-lg text-[#e8e4dc] truncate">{mod.title}</h4>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <div className="flex-1 max-w-[180px] bg-white/[0.06] h-1 rounded-full overflow-hidden">
                                     <div className="h-full rounded-full transition-all duration-700" style={{
                                       width: `${modPct}%`,
-                                      background: isModuleDone ? 'linear-gradient(90deg, #34d399, #6ee7b7)' : 'linear-gradient(90deg, #818cf8, #a78bfa)'
+                                      background: isModuleDone ? 'linear-gradient(90deg, #8baa6e, #a8c98a)' : 'linear-gradient(90deg, #c4b998, #d4c9a8)'
                                     }} />
                                   </div>
-                                  <span className="text-[10px] font-black text-white/40">{modCompleted}/{modTotal}</span>
+                                  <span className="text-[10px] font-medium text-white/30">{modCompleted}/{modTotal}</span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                {mod.subtopics.map(sub => {
                                  const isToday = !sub.is_completed && !sub.is_review && sub.day_number === currentDay;
                                  const isLocked = !sub.is_completed && !sub.is_review && sub.day_number > currentDay;
@@ -985,92 +1055,83 @@ const App: React.FC = () => {
                                    <div
                                      key={sub.id}
                                      onClick={() => { if (isAccessible) setActiveSession({ agentId: selectedAgentId!, subtopic: sub }); }}
-                                     className={`group relative p-6 rounded-[2rem] border transition-all duration-300 overflow-hidden ${
+                                     className={`group relative p-5 rounded-2xl border transition-all duration-200 overflow-hidden ${
                                        isLocked
-                                         ? 'bg-white/[0.03] border-white/[0.08] cursor-not-allowed'
+                                         ? 'bg-white/[0.02] border-white/[0.05] cursor-not-allowed'
                                          : sub.is_review
-                                           ? 'figma-glass border-amber-400/30 hover:border-amber-400/60 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                           ? 'figma-glass border-amber-500/15 hover:border-amber-500/30 cursor-pointer hover:-translate-y-0.5'
                                            : sub.is_completed
-                                             ? 'figma-glass border-emerald-400/30 hover:border-emerald-400/60 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                             ? 'figma-glass border-[#8baa6e]/20 hover:border-[#8baa6e]/40 cursor-pointer hover:-translate-y-0.5'
                                              : isToday
-                                               ? 'figma-glass border-indigo-400/50 cursor-pointer hover:-translate-y-1 hover:shadow-xl shadow-lg shadow-indigo-500/10'
-                                               : 'figma-glass border-white/20 hover:border-indigo-400/50 cursor-pointer hover:-translate-y-1 hover:shadow-xl'
+                                               ? 'figma-glass border-[#c4b998]/30 cursor-pointer hover:-translate-y-0.5 shadow-lg shadow-[#c4b998]/[0.03]'
+                                               : 'figma-glass hover:border-white/15 cursor-pointer hover:-translate-y-0.5'
                                      }`}
                                    >
-                                      {/* Today pulse ring */}
+                                      {/* Today indicator dot */}
                                       {isToday && (
-                                        <div className="absolute -top-1 -right-1 w-3 h-3">
-                                          <span className="absolute inset-0 rounded-full bg-indigo-400 animate-ping opacity-75" />
-                                          <span className="absolute inset-0 rounded-full bg-indigo-400" />
+                                        <div className="absolute top-3 right-3 w-2 h-2">
+                                          <span className="absolute inset-0 rounded-full bg-[#c4b998] animate-ping opacity-50" />
+                                          <span className="absolute inset-0 rounded-full bg-[#c4b998]" />
                                         </div>
                                       )}
 
-                                      {/* Hover glow */}
-                                      {!isLocked && (
-                                        <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${
-                                          sub.is_review ? 'bg-gradient-to-br from-amber-500/10 to-transparent'
-                                          : sub.is_completed ? 'bg-gradient-to-br from-emerald-500/10 to-transparent'
-                                          : 'bg-gradient-to-br from-indigo-500/10 to-transparent'
-                                        }`} />
-                                      )}
-
-                                      <div className={`relative z-10 ${isLocked ? 'opacity-40' : ''}`}>
-                                        <div className="flex justify-between items-center mb-5">
+                                      <div className={`${isLocked ? 'opacity-30' : ''}`}>
+                                        <div className="flex justify-between items-center mb-4">
                                           <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg ${
+                                            <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg ${
                                               sub.is_review
-                                                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                                                ? 'bg-amber-500/10 text-amber-400/80 border border-amber-500/15'
                                                 : sub.is_completed
-                                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                                  ? 'bg-[#8baa6e]/10 text-[#8baa6e] border border-[#8baa6e]/15'
                                                   : isToday
-                                                    ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/40'
+                                                    ? 'bg-[#c4b998]/10 text-[#c4b998] border border-[#c4b998]/20'
                                                     : isLocked
-                                                      ? 'bg-white/5 text-white/30 border border-white/10'
-                                                      : 'bg-white/10 text-white/80 border border-white/20'
+                                                      ? 'bg-white/[0.03] text-white/20 border border-white/[0.05]'
+                                                      : 'bg-white/[0.05] text-white/50 border border-white/[0.08]'
                                             }`}>
                                               {sub.is_review ? 'Review' : `Day ${dayLabel(sub.day_number)}`}
                                             </span>
                                             {isToday && (
-                                              <span className="text-[9px] font-black px-2.5 py-1 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 uppercase tracking-widest">
+                                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-[#c4b998]/10 text-[#c4b998] border border-[#c4b998]/15">
                                                 Today
                                               </span>
                                             )}
                                           </div>
                                           <div className="flex items-center gap-2">
                                             {typeof sub.quiz_score === 'number' && (
-                                              <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg ${
+                                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
                                                 sub.quiz_score >= 70
-                                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                                  : 'bg-rose-500/20 text-rose-300 border border-rose-400/30'
+                                                  ? 'bg-[#8baa6e]/10 text-[#8baa6e] border border-[#8baa6e]/15'
+                                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/15'
                                               }`}>{sub.quiz_score}%</span>
                                             )}
                                             {isLocked
-                                              ? <Lock size={14} className="text-white/20" />
-                                              : <span className="text-[9px] font-bold text-white/40 uppercase">{sub.difficulty}</span>
+                                              ? <Lock size={13} className="text-white/15" />
+                                              : <span className="text-[9px] font-medium text-white/25">{sub.difficulty}</span>
                                             }
                                           </div>
                                         </div>
-                                        <h5 className={`font-black text-lg leading-snug ${isLocked ? 'text-white/30' : 'text-white'}`}>{sub.title}</h5>
+                                        <h5 className={`font-semibold text-[15px] leading-snug ${isLocked ? 'text-white/20' : 'text-[#e8e4dc]'}`}>{sub.title}</h5>
                                         {sub.is_review && sub.weak_concepts && sub.weak_concepts.length > 0 && (
-                                          <div className="flex flex-wrap gap-1.5 mt-3">
+                                          <div className="flex flex-wrap gap-1.5 mt-2.5">
                                             {sub.weak_concepts.slice(0, 3).map((c, i) => (
-                                              <span key={i} className="text-[9px] font-bold bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full border border-amber-400/20">{c.length > 30 ? c.slice(0, 30) + '...' : c}</span>
+                                              <span key={i} className="text-[9px] font-medium bg-amber-500/8 text-amber-400/70 px-2 py-0.5 rounded-md border border-amber-500/10">{c.length > 30 ? c.slice(0, 30) + '...' : c}</span>
                                             ))}
                                           </div>
                                         )}
                                       </div>
-                                      <div className={`relative z-10 mt-6 pt-4 border-t text-[10px] font-black uppercase tracking-widest ${isLocked ? 'border-white/5' : 'border-white/10'}`}>
+                                      <div className={`mt-4 pt-3 border-t text-[10px] font-semibold ${isLocked ? 'border-white/[0.03]' : 'border-white/[0.06]'}`}>
                                         {sub.is_completed ? (
-                                          <span className="text-emerald-400 flex items-center gap-1.5">
+                                          <span className="text-[#8baa6e] flex items-center gap-1.5">
                                             <CheckCircle2 size={12} /> Completed
                                           </span>
                                         ) : isLocked ? (
-                                          <span className="text-white/20 flex items-center gap-1.5">
+                                          <span className="text-white/15 flex items-center gap-1.5">
                                             <Lock size={12} /> Locked
                                           </span>
                                         ) : sub.is_review ? (
                                           <div className="flex items-center justify-between w-full">
-                                            <span className="text-amber-400 group-hover:text-amber-300 transition-colors">Start Review →</span>
+                                            <span className="text-amber-400/70 group-hover:text-amber-300 transition-colors">Start Review →</span>
                                             <button
                                               onClick={(e) => {
                                                 e.stopPropagation();
@@ -1079,15 +1140,15 @@ const App: React.FC = () => {
                                                 btn.dataset.clicked = 'true';
                                                 handleMarkReviewRead(selectedAgentId!, sub.id);
                                               }}
-                                              className="text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-emerald-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-emerald-500/10 border border-transparent hover:border-emerald-400/30"
+                                              className="text-[10px] font-semibold text-white/30 hover:text-[#8baa6e] transition-colors px-2.5 py-1 rounded-lg hover:bg-[#8baa6e]/10 border border-transparent hover:border-[#8baa6e]/20"
                                             >
                                               Mark as Read
                                             </button>
                                           </div>
                                         ) : isToday ? (
-                                          <span className="text-indigo-300 group-hover:text-white transition-colors">Start Today's Lesson →</span>
+                                          <span className="text-[#c4b998] group-hover:text-[#e8e4dc] transition-colors">Start Today's Lesson →</span>
                                         ) : (
-                                          <span className="text-indigo-300 group-hover:text-white transition-colors">Start Adaptive Lesson →</span>
+                                          <span className="text-white/40 group-hover:text-[#e8e4dc] transition-colors">Start Lesson →</span>
                                         )}
                                       </div>
                                    </div>
@@ -1100,39 +1161,39 @@ const App: React.FC = () => {
                    })()}
 
                    {/* Final Assessment Section */}
-                   <div className="pt-16 border-t border-white/10 text-center space-y-8">
-                      <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-[2rem] mx-auto flex items-center justify-center shadow-2xl shadow-indigo-500/30 border border-white/20">
-                        <Trophy size={32}/>
+                   <div className="pt-12 border-t border-white/[0.06] text-center space-y-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-[#c4b998] to-[#a89870] text-[#111113] rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-[#c4b998]/10">
+                        <Trophy size={28}/>
                       </div>
                       <div className="max-w-md mx-auto">
-                        <h4 className="text-3xl font-black italic tracking-tight text-white">Course Mastery Terminal</h4>
-                        <p className="text-white/50 font-bold text-sm mt-2">Validate your total understanding with a rigorous 30-question final challenge.</p>
+                        <h4 className="text-2xl font-bold tracking-tight text-[#e8e4dc]">Final Assessment</h4>
+                        <p className="text-white/30 font-medium text-sm mt-2">Validate your understanding with a 30-question challenge.</p>
                       </div>
 
                       {currentAgent?.final_assessment?.is_completed ? (
-                        <div className="figma-glass-blue p-10 rounded-[3rem] border border-indigo-400/30 animate-in zoom-in-95">
-                          <p className="text-[10px] font-black uppercase text-indigo-300 tracking-widest mb-2">Assessment Results</p>
-                          <p className="text-6xl font-black italic text-white mb-6">{currentAgent.final_assessment.score}%</p>
-                          <div className="text-left space-y-4">
-                             <p className="text-sm font-bold text-indigo-100 italic leading-relaxed">"{currentAgent.final_assessment.feedback}"</p>
-                             <button onClick={() => setIsFinalAssessmentOpen(true)} className="text-[10px] font-black uppercase text-indigo-300 hover:text-white underline transition-colors">Retake Mastery Challenge</button>
+                        <div className="figma-glass-blue p-8 border border-[#c4b998]/15 animate-in zoom-in-95">
+                          <p className="text-[10px] font-semibold text-[#c4b998] mb-2">Assessment Results</p>
+                          <p className="text-5xl font-bold text-[#e8e4dc] mb-5">{currentAgent.final_assessment.score}%</p>
+                          <div className="text-left space-y-3">
+                             <p className="text-sm font-medium text-white/50 italic leading-relaxed">"{currentAgent.final_assessment.feedback}"</p>
+                             <button onClick={() => setIsFinalAssessmentOpen(true)} className="text-[10px] font-semibold text-[#c4b998] hover:text-[#e8e4dc] underline transition-colors">Retake</button>
                           </div>
                         </div>
                       ) : (
                         <button
                           onClick={() => setIsFinalAssessmentOpen(true)}
-                          className={`w-full max-w-md py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-2xl transition-all duration-300 ${
+                          className={`w-full max-w-md py-5 rounded-xl font-bold text-sm transition-all duration-200 ${
                             currentAgent?.progress === 100
-                              ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:shadow-indigo-500/40 hover:-translate-y-1 border border-white/20'
-                              : 'bg-white/5 text-white/30 cursor-not-allowed border border-white/10'
+                              ? 'bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] hover:shadow-lg hover:shadow-[#c4b998]/10 hover:-translate-y-0.5'
+                              : 'bg-white/[0.04] text-white/20 cursor-not-allowed border border-white/[0.06]'
                           }`}
                           disabled={currentAgent?.progress !== 100}
                         >
-                          {currentAgent?.progress === 100 ? 'Launch Final Mastery Challenge' : `Complete All Lessons (${currentAgent?.progress}%)`}
+                          {currentAgent?.progress === 100 ? 'Start Final Assessment' : `Complete All Lessons (${currentAgent?.progress}%)`}
                         </button>
                       )}
                       {currentAgent?.progress !== 100 && (
-                        <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Mastery node unlocks at 100% roadmap completion.</p>
+                        <p className="text-[10px] font-medium text-white/20">Unlocks at 100% completion.</p>
                       )}
                    </div>
                 </div>
@@ -1154,86 +1215,86 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="md:hidden fixed bottom-6 inset-x-4 sm:inset-x-10 figma-glass rounded-[2.5rem] h-[84px] flex items-center justify-between px-4 sm:px-8 z-50 shadow-2xl">
+      <nav className="md:hidden fixed bottom-4 inset-x-4 sm:inset-x-8 bg-[#1a1a1e]/90 backdrop-blur-2xl rounded-2xl h-[68px] flex items-center justify-around px-2 z-50 border border-white/[0.06] shadow-2xl shadow-black/40">
         {[
-          { id: 'home', label: 'Subjects', icon: Home },
+          { id: 'home', label: 'Courses', icon: Home },
           { id: 'planner', label: 'Schedule', icon: Calendar },
-          { id: 'stats', label: 'Velocity', icon: Zap },
+          { id: 'stats', label: 'Analytics', icon: Zap },
           { id: 'me', label: 'Profile', icon: UserIcon }
         ].map(n => (
-          <button key={n.id} onClick={() => { setActiveScreen(n.id as any); setSelectedAgentId(null); }} className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-[1.5rem] transition-all duration-300 ${activeScreen === n.id ? 'text-white' : 'text-white/50 hover:text-white/80'}`}>
+          <button key={n.id} onClick={() => { setActiveScreen(n.id as any); setSelectedAgentId(null); }} className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-xl transition-all duration-200 ${activeScreen === n.id ? 'text-[#c4b998]' : 'text-white/30 hover:text-white/50'}`}>
             {activeScreen === n.id && (
-              <span className="absolute inset-0 bg-white/20 shadow-inner rounded-[1.5rem] -z-10 animate-in zoom-in duration-300 border border-white/30"></span>
+              <span className="absolute inset-0 bg-[#c4b998]/8 rounded-xl -z-10 border border-[#c4b998]/10"></span>
             )}
-            <n.icon size={22} className={`transition-all duration-300 ${activeScreen === n.id ? 'scale-110 drop-shadow-md text-white mb-1' : 'opacity-80 group-hover:opacity-100 group-hover:scale-105'}`} />
-            <span className={`text-[8px] font-black uppercase tracking-widest transition-all duration-300 ${activeScreen === n.id ? 'opacity-100 scale-100 text-white' : 'opacity-0 scale-95 h-0 overflow-hidden'}`}>{n.label}</span>
+            <n.icon size={20} className="mb-0.5" />
+            <span className={`text-[8px] font-semibold transition-all ${activeScreen === n.id ? 'opacity-100 text-[#c4b998]' : 'opacity-0 h-0 overflow-hidden'}`}>{n.label}</span>
           </button>
         ))}
       </nav>
 
       {isAgentModalOpen && (
-        <div className="fixed inset-0 z-[150] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="figma-glass-blue figma-scrollbar rounded-[2.5rem] p-8 sm:p-10 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto border border-white/20">
-              <div className="mb-8">
-                 <h2 className="text-3xl font-black tracking-tight text-white">Add New Subject</h2>
-                 <p className="text-sm font-medium text-white/50 mt-2">Our AI will synthesize a custom roadmap for you.</p>
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-[#1a1a1e] figma-scrollbar rounded-2xl p-7 sm:p-8 max-w-lg w-full shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto border border-white/[0.08]">
+              <div className="mb-6">
+                 <h2 className="text-2xl font-bold tracking-tight text-[#e8e4dc]">New Course</h2>
+                 <p className="text-sm font-medium text-white/30 mt-1">AI will generate a personalized roadmap for you.</p>
               </div>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Subject Name</label>
-                  <input type="text" placeholder="e.g. Calculus, SEO, Quantum Computing" className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold focus:border-white transition-all text-white placeholder:text-white/30 shadow-inner" value={newAgent.name} onChange={e => setNewAgent({...newAgent, name: e.target.value})} />
+                  <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Subject Name</label>
+                  <input type="text" placeholder="e.g. Calculus, SEO, Quantum Computing" className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium focus:border-[#c4b998]/40 transition-all text-[#e8e4dc] placeholder:text-white/20 text-sm" value={newAgent.name} onChange={e => setNewAgent({...newAgent, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Syllabus / Key Topics</label>
-                  <textarea rows={3} placeholder="Paste your syllabus or list key topics to cover..." className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-sm resize-none focus:border-white transition-all text-white placeholder:text-white/30 shadow-inner" value={newAgent.syllabus} onChange={e => setNewAgent({...newAgent, syllabus: e.target.value})} />
+                  <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Syllabus / Key Topics</label>
+                  <textarea rows={3} placeholder="Paste your syllabus or list key topics..." className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-sm resize-none focus:border-[#c4b998]/40 transition-all text-[#e8e4dc] placeholder:text-white/20" value={newAgent.syllabus} onChange={e => setNewAgent({...newAgent, syllabus: e.target.value})} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Duration</label>
-                    <input type="number" min="1" className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-white shadow-inner focus:border-white transition-all" value={timeframeValue} onChange={e => setTimeframeValue(parseInt(e.target.value) || 1)} />
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Duration</label>
+                    <input type="number" min="1" className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-[#e8e4dc] focus:border-[#c4b998]/40 transition-all text-sm" value={timeframeValue} onChange={e => setTimeframeValue(parseInt(e.target.value) || 1)} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Unit</label>
-                    <select className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-white shadow-inner focus:border-white transition-all" value={timeframeUnit} onChange={e => setTimeframeUnit(e.target.value)}>
-                      <option className="bg-slate-900" value="day">Day(s)</option>
-                      <option className="bg-slate-900" value="week">Week(s)</option>
-                      <option className="bg-slate-900" value="month">Month(s)</option>
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Unit</label>
+                    <select className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-[#e8e4dc] focus:border-[#c4b998]/40 transition-all text-sm" value={timeframeUnit} onChange={e => setTimeframeUnit(e.target.value)}>
+                      <option className="bg-[#1a1a1e]" value="day">Day(s)</option>
+                      <option className="bg-[#1a1a1e]" value="week">Week(s)</option>
+                      <option className="bg-[#1a1a1e]" value="month">Month(s)</option>
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Difficulty</label>
-                    <select className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-sm text-white shadow-inner focus:border-white transition-all" value={difficultyLevel} onChange={e => setDifficultyLevel(e.target.value)}>
-                      <option className="bg-slate-900" value="Beginner">Beginner</option>
-                      <option className="bg-slate-900" value="Intermediate">Intermediate</option>
-                      <option className="bg-slate-900" value="Advanced">Advanced</option>
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Difficulty</label>
+                    <select className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-sm text-[#e8e4dc] focus:border-[#c4b998]/40 transition-all" value={difficultyLevel} onChange={e => setDifficultyLevel(e.target.value)}>
+                      <option className="bg-[#1a1a1e]" value="Beginner">Beginner</option>
+                      <option className="bg-[#1a1a1e]" value="Intermediate">Intermediate</option>
+                      <option className="bg-[#1a1a1e]" value="Advanced">Advanced</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Learning Style</label>
-                    <select className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-sm text-white shadow-inner focus:border-white transition-all" value={learningStyle} onChange={e => setLearningStyle(e.target.value)}>
-                      <option className="bg-slate-900" value="Theoretical">Theoretical</option>
-                      <option className="bg-slate-900" value="Practical">Practical</option>
-                      <option className="bg-slate-900" value="Fast-paced">Fast-paced</option>
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Learning Style</label>
+                    <select className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-sm text-[#e8e4dc] focus:border-[#c4b998]/40 transition-all" value={learningStyle} onChange={e => setLearningStyle(e.target.value)}>
+                      <option className="bg-[#1a1a1e]" value="Theoretical">Theoretical</option>
+                      <option className="bg-[#1a1a1e]" value="Practical">Practical</option>
+                      <option className="bg-[#1a1a1e]" value="Fast-paced">Fast-paced</option>
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Daily Hours</label>
-                    <input type="number" min="1" max="12" className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-white shadow-inner focus:border-white transition-all" value={dailyHours} onChange={e => setDailyHours(parseInt(e.target.value) || 1)} />
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Daily Hours</label>
+                    <input type="number" min="1" max="12" className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-[#e8e4dc] focus:border-[#c4b998]/40 transition-all text-sm" value={dailyHours} onChange={e => setDailyHours(parseInt(e.target.value) || 1)} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-white/50 ml-2 mb-2 block">Textbook (Optional)</label>
-                    <input type="text" placeholder="e.g. CLRS, Thomas Calc" className="w-full p-4 rounded-2xl bg-white/10 border border-white/20 outline-none font-bold text-sm focus:border-white transition-all text-white placeholder:text-white/30 shadow-inner" value={referenceTextbook} onChange={e => setReferenceTextbook(e.target.value)} />
+                    <label className="text-[10px] font-semibold text-white/40 ml-1 mb-1.5 block">Textbook (Optional)</label>
+                    <input type="text" placeholder="e.g. CLRS, Thomas Calc" className="w-full p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] outline-none font-medium text-sm focus:border-[#c4b998]/40 transition-all text-[#e8e4dc] placeholder:text-white/20" value={referenceTextbook} onChange={e => setReferenceTextbook(e.target.value)} />
                   </div>
                 </div>
-                <div className="pt-4">
-                  <button disabled={loading} onClick={handleCreateAgent} className="w-full py-5 bg-white text-[#0d62bb] rounded-[1.5rem] font-black uppercase tracking-widest shadow-xl hover:bg-slate-100 disabled:opacity-50 transition-all border border-transparent hover:border-white/20">
-                    {loading ? 'Synthesizing Roadmap...' : 'Generate Roadmap'}
+                <div className="pt-3">
+                  <button disabled={loading} onClick={handleCreateAgent} className="w-full py-4 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-xl font-bold text-sm shadow-lg shadow-[#c4b998]/10 hover:shadow-[#c4b998]/20 disabled:opacity-50 transition-all">
+                    {loading ? 'Generating Roadmap...' : 'Generate Roadmap'}
                   </button>
-                  <button onClick={() => setIsAgentModalOpen(false)} className="w-full mt-4 text-[10px] font-bold text-white/50 hover:text-white uppercase tracking-widest transition-colors">Cancel</button>
+                  <button onClick={() => setIsAgentModalOpen(false)} className="w-full mt-3 text-xs font-medium text-white/30 hover:text-white/60 transition-colors py-2">Cancel</button>
                 </div>
               </div>
            </div>
