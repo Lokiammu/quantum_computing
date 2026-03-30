@@ -87,9 +87,20 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     }
   };
 
-  // Called on user click — gets camera permission + enters fullscreen (user gesture required for both)
+  const stopCamera = () => {
+    if (faceCheckRef.current) clearInterval(faceCheckRef.current);
+    if (faceWarningTimeoutRef.current) clearTimeout(faceWarningTimeoutRef.current);
+    webcamStreamRef.current?.getTracks().forEach(t => t.stop());
+    webcamStreamRef.current = null;
+    if (webcamVideoRef.current) webcamVideoRef.current.srcObject = null;
+    setCameraActive(false);
+    setShowFaceWarning(false);
+    consecutiveMissRef.current = 0;
+  };
+
+  // Called on user click — enters fullscreen (user gesture required)
+  // Camera is only started when the quiz tab is opened
   const handleStartSession = async () => {
-    await startCamera();
     document.documentElement.requestFullscreen?.().catch(() => {});
     setSessionStarted(true);
   };
@@ -110,7 +121,7 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
       webcamStreamRef.current = null;
       document.exitFullscreen?.().catch(() => {});
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Face detection loop — ONLY active during 'quiz' tab
   // Verifies human presence; counts distractions when face not detected
@@ -152,10 +163,12 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     };
   }, [cameraActive, activeTab]);
 
-  // Auto-start camera when entering the Quiz tab
+  // Camera lifecycle: ON only during quiz tab, OFF everywhere else
   useEffect(() => {
-    if (activeTab === 'quiz' && !cameraActive && !cameraError) {
-      startCamera();
+    if (activeTab === 'quiz') {
+      if (!cameraActive && !cameraError) startCamera();
+    } else {
+      if (cameraActive) stopCamera();
     }
   }, [activeTab]);
 
@@ -523,7 +536,7 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
     return (
       <div className="fixed inset-0 bg-[#111113] z-[200] flex flex-col items-center justify-center p-10 text-center animate-in fade-in duration-300">
         <div className="absolute inset-0 pointer-events-none"><div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-[#c4b998]/[0.04] rounded-full blur-[120px]" /></div>
-        <video ref={webcamRefCallback} autoPlay muted playsInline className="hidden" />
+        <video ref={webcamRefCallback} autoPlay muted playsInline className="hidden absolute" aria-hidden="true" />
         <div className="w-16 h-16 border-4 border-[#c4b998] border-t-transparent rounded-full animate-spin mb-8"></div>
         <h2 className="text-3xl font-bold text-[#e8e4dc] tracking-tight">Sourcing Academic Bundle...</h2>
         <p className="text-white/30 font-medium mt-3 max-w-sm">Gathering readable textbooks, PDF notes, and topic-specific resources from global libraries.</p>
@@ -552,32 +565,31 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
         <div className="flex items-center gap-5">
           {/* Webcam circle + monitoring badge */}
           <div className="flex items-center gap-3">
-            <div
-              onClick={() => { if (!cameraActive) startCamera(); }}
-              className={`w-12 h-12 rounded-full overflow-hidden border-2 shadow-lg shrink-0 relative ${cameraActive ? ((activeTab === 'video' || activeTab === 'quiz') && showFaceWarning ? 'border-[#c97070] shadow-[#c97070]/30' : activeTab === 'quiz' ? 'border-[#c4b998] shadow-[#c4b998]/20 ring-2 ring-[#c4b998]/30' : 'border-[#8baa6e] shadow-[#8baa6e]/20') : 'border-white/20 cursor-pointer hover:border-[#c4b998]/40'}`}
-              title={cameraActive ? (activeTab === 'quiz' ? 'Monitoring active — Quiz mode' : 'Webcam active') : 'Click to enable camera'}
-            >
-              <video
-                ref={webcamRefCallback}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover scale-x-[-1]"
-              />
-              {!cameraActive && (
-                <div className="absolute inset-0 bg-white/[0.04] flex items-center justify-center">
-                  {cameraError
-                    ? <span className="text-[7px] font-bold text-white/40 uppercase text-center leading-tight px-1">Click to<br/>enable</span>
-                    : <div className="w-4 h-4 border-2 border-[#c4b998] border-t-transparent rounded-full animate-spin" />
-                  }
-                </div>
-              )}
-              {showFaceWarning && cameraActive && (activeTab === 'video' || activeTab === 'quiz') && (
-                <div className="absolute inset-0 bg-[#c97070]/30 flex items-center justify-center animate-pulse">
-                  <AlertTriangle size={16} className="text-white drop-shadow" />
-                </div>
-              )}
-            </div>
+            {/* Webcam circle — only shown during quiz tab */}
+            {activeTab === 'quiz' && (
+              <div
+                className={`w-12 h-12 rounded-full overflow-hidden border-2 shadow-lg shrink-0 relative ${cameraActive ? (showFaceWarning ? 'border-[#c97070] shadow-[#c97070]/30' : 'border-[#c4b998] shadow-[#c4b998]/20 ring-2 ring-[#c4b998]/30') : 'border-white/20'}`}
+                title="Face monitoring active — Quiz mode"
+              >
+                <video
+                  ref={webcamRefCallback}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+                {!cameraActive && (
+                  <div className="absolute inset-0 bg-white/[0.04] flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-[#c4b998] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                {showFaceWarning && cameraActive && (
+                  <div className="absolute inset-0 bg-[#c97070]/30 flex items-center justify-center animate-pulse">
+                    <AlertTriangle size={16} className="text-white drop-shadow" />
+                  </div>
+                )}
+              </div>
+            )}
             {/* Monitoring status badge */}
             {activeTab === 'quiz' && cameraActive && (
               <div className="hidden sm:flex items-center gap-1.5 bg-[#c97070]/15 border border-[#c97070]/25 rounded-full px-3 py-1 animate-in fade-in duration-300">
@@ -585,13 +597,7 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                 <span className="text-[9px] font-semibold text-[#c97070] uppercase tracking-wider">Monitoring</span>
               </div>
             )}
-            {activeTab === 'video' && cameraActive && (
-              <div className="hidden sm:flex items-center gap-1.5 bg-[#8baa6e]/10 border border-[#8baa6e]/20 rounded-full px-3 py-1">
-                <div className="w-2 h-2 rounded-full bg-[#8baa6e]" />
-                <span className="text-[9px] font-semibold text-[#8baa6e]/70 uppercase tracking-wider">Camera On</span>
-              </div>
-            )}
-            {activeTab !== 'video' && activeTab !== 'quiz' && (
+            {activeTab !== 'quiz' && (
               <div className="hidden sm:flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-full px-3 py-1">
                 <div className="w-2 h-2 rounded-full bg-white/20" />
                 <span className="text-[9px] font-semibold text-white/20 uppercase tracking-wider">Idle</span>
