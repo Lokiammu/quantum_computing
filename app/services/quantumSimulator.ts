@@ -1,13 +1,7 @@
 
-import { CognitiveLoadState, MasteryState, ScheduleEvent, Task } from "../types";
+import { BehavioralMetrics, CognitiveLoadState, MasteryState, ScheduleEvent, Task } from "../types";
 
-export interface BehavioralMetrics {
-  time_spent: number;
-  response_time: number;
-  error_rate: number;
-  retries: number;
-  interaction_frequency: number;
-}
+export type { BehavioralMetrics };
 
 export type CognitiveLoadExplanation = {
   predicted: CognitiveLoadState;

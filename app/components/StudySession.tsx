@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SubTopic, MasteryState, ChatMessage, LearningAgent, AcademicBundle, CognitiveLoadState, QuizItem } from '../types';
+import { SubTopic, MasteryState, ChatMessage, LearningAgent, AcademicBundle, CognitiveLoadState, QuizItem, BehavioralMetrics } from '../types';
 import { fastapiService } from '../services/fastapiService';
-import { BehavioralMetrics } from '../services/quantumSimulator';
 import { extractNotesFeatures, extractQuizFeatures, extractVideoFeatures } from '../services/qsvmFeatureExtractor';
 import { ExternalLink, Youtube, FileText, BookOpen, GraduationCap, CheckCircle2, FileSearch, LibraryBig, Sparkles, Layers, AlertTriangle, Clock } from 'lucide-react';
 import { detectFace } from '../services/faceDetector';
@@ -10,7 +9,7 @@ import { detectFace } from '../services/faceDetector';
 interface StudySessionProps {
   subtopic: SubTopic;
   agent: LearningAgent;
-  onComplete: (stats: { focusTime: number, distractions: number, bundle: AcademicBundle, loadState: CognitiveLoadState, quizScore?: number, wrongAnswers?: string[] }) => void;
+  onComplete: (stats: { focusTime: number, distractions: number, bundle: AcademicBundle, loadState: CognitiveLoadState, quizScore?: number, wrongAnswers?: string[], behavioral_metrics?: BehavioralMetrics }) => void;
   onExit: () => void;
   onUpdateChat: (messages: ChatMessage[]) => void;
 }
@@ -375,7 +374,7 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
 
     const quizScorePercent = activeQuizSet.length > 0 ? Math.round((quizScore / activeQuizSet.length) * 100) : undefined;
     setIsFinalized(true);
-    onComplete({ focusTime, distractions, bundle: bundle!, loadState, quizScore: quizScorePercent, wrongAnswers: quizWrongAnswersRef.current.length > 0 ? quizWrongAnswersRef.current : undefined });
+    onComplete({ focusTime, distractions, bundle: bundle!, loadState, quizScore: quizScorePercent, wrongAnswers: quizWrongAnswersRef.current.length > 0 ? quizWrongAnswersRef.current : undefined, behavioral_metrics: metrics });
   };
 
   const getEmbedUrl = (url: string) => {

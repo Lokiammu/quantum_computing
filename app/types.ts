@@ -99,12 +99,20 @@ export interface FinalAssessment {
   weak_areas?: string[];
 }
 
+export interface BehavioralMetrics {
+  time_spent: number;
+  response_time: number;
+  error_rate: number;
+  retries: number;
+  interaction_frequency: number;
+}
+
 export interface SubTopic {
   id: string;
   module_id: string;
   title: string;
   day_number: number;
-  daily_goals: string[]; 
+  daily_goals: string[];
   difficulty: Difficulty;
   is_completed: boolean;
   is_synthesized?: boolean;
@@ -113,6 +121,7 @@ export interface SubTopic {
   weak_concepts?: string[];
   is_review?: boolean;
   review_of?: string;
+  behavioral_metrics?: BehavioralMetrics;
 }
 
 export interface Module {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, LearningAgent, Task, ScheduleEvent, SubTopic, Difficulty, ChatMessage, AcademicBundle, Module, CognitiveLoadState, MasteryState } from './types';
+import { User, LearningAgent, Task, ScheduleEvent, SubTopic, Difficulty, ChatMessage, AcademicBundle, Module, CognitiveLoadState, MasteryState, BehavioralMetrics } from './types';
 import { firebaseService } from './services/firebaseService';
 import { fastapiService } from './services/fastapiService';
 import { authApi } from './services/authApi';
@@ -362,7 +362,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSessionComplete = async (stats: { focusTime: number, distractions: number, bundle: AcademicBundle, loadState: CognitiveLoadState, quizScore?: number, wrongAnswers?: string[] }) => {
+  const handleSessionComplete = async (stats: { focusTime: number, distractions: number, bundle: AcademicBundle, loadState: CognitiveLoadState, quizScore?: number, wrongAnswers?: string[], behavioral_metrics?: BehavioralMetrics }) => {
     if (!activeSession) return;
 
     const quizScore = typeof stats.quizScore === 'number' ? stats.quizScore : null;
@@ -400,7 +400,7 @@ const App: React.FC = () => {
         const idMatch = s.id === targetSubId;
         const modMatch = !targetModId || m.id === targetModId || s.module_id === targetModId;
         return (idMatch && modMatch)
-          ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined }
+          ? { ...s, is_completed: true, is_synthesized: true, bundle: stats.bundle, quiz_score: quizScore ?? undefined, weak_concepts: weakConcepts.length ? weakConcepts : undefined, behavioral_metrics: stats.behavioral_metrics }
           : s;
       })
     }));

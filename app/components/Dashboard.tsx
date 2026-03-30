@@ -4,8 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { LearningAgent, CognitiveLoadState, Module } from '../types';
-import { classifyCognitiveLoad, BehavioralMetrics } from '../services/quantumSimulator';
+import { LearningAgent, CognitiveLoadState, Module, BehavioralMetrics } from '../types';
+import { classifyCognitiveLoad } from '../services/quantumSimulator';
 import {
   CheckCircle2, Zap, Clock, Target, GraduationCap, Brain,
   RefreshCw, AlertTriangle, TrendingUp, ChevronDown, BookOpen, Flame,
@@ -197,23 +197,22 @@ const Dashboard: React.FC<DashboardProps> = ({ agents }) => {
       }))
     );
 
-    // Run QSVM on synthetic behavioral metrics from completed subtopics for feature contribution viz
+    // Run QSVM on behavioral metrics from completed subtopics for feature contribution viz
+    // Uses real tracked behavioral_metrics when available, falls back to quiz-derived estimates
     const featureContributions: { topic: string; time_spent: number; response_time: number; error_rate: number; retries: number; interaction_frequency: number; state: string; confidence: number }[] = [];
 
     for (const a of agents) {
       for (const m of a.roadmap) {
         for (const s of m.subtopics) {
           if (!s.is_completed || s.is_review) continue;
-          // Derive behavioral metrics from available data
           const quizScore = s.quiz_score ?? 50;
-          const errorRate = Math.max(0, (100 - quizScore) / 100);
-          const retries = (s.weak_concepts?.length || 0);
-          const metrics: BehavioralMetrics = {
-            time_spent: 45 + Math.random() * 60,
+          // Use real tracked metrics if stored, otherwise derive deterministically from quiz data
+          const metrics: BehavioralMetrics = s.behavioral_metrics ?? {
+            time_spent: 60,
             response_time: 10 + (1 - quizScore / 100) * 30,
-            error_rate: errorRate,
-            retries: retries,
-            interaction_frequency: 5 + Math.random() * 10,
+            error_rate: Math.max(0, (100 - quizScore) / 100),
+            retries: s.weak_concepts?.length ?? 0,
+            interaction_frequency: 8,
           };
           const result = classifyCognitiveLoad(metrics);
           featureContributions.push({
