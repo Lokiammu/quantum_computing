@@ -1,7 +1,11 @@
 import React from 'react';
 import { BrainCircuit, Cpu, Sparkles, Zap, BookOpen, Shield, ArrowRight, Code, Database, Server } from 'lucide-react';
 
-const About: React.FC = () => {
+interface AboutProps {
+  onEnter?: () => void;
+}
+
+const About: React.FC<AboutProps> = ({ onEnter }) => {
   const features = [
     {
       icon: BrainCircuit,
@@ -85,7 +89,14 @@ const About: React.FC = () => {
             </p>
             
             <div className="flex items-center gap-4 pt-4">
-              <button onClick={() => window.location.href='/dashboard'} className="px-8 py-4 rounded-xl bg-gradient-to-r from-[#c4b998] to-[#9a8e6b] text-black font-semibold tracking-wide hover:shadow-[0_0_40px_rgba(196,185,152,0.4)] transition-all duration-300 flex items-center gap-2 group">
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onEnter) onEnter(); 
+                  else window.location.href='/dashboard';
+                }} 
+                className="px-8 py-4 rounded-xl bg-gradient-to-r from-[#c4b998] to-[#9a8e6b] text-black font-semibold tracking-wide hover:shadow-[0_0_40px_rgba(196,185,152,0.4)] transition-all duration-300 flex items-center gap-2 group"
+              >
                 Enter Platform
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>

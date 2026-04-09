@@ -636,12 +636,12 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
            </div>
            {isFinalized ? (
              <button onClick={() => { document.exitFullscreen?.().catch(() => {}); onExit(); }} className="px-5 py-2.5 bg-gradient-to-r from-[#c4b998] to-[#a89870] text-[#111113] rounded-lg font-bold text-[10px] uppercase tracking-widest shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all">
-               Exit Session
+               Complete Session
              </button>
            ) : (
-             <div className="w-10 h-10 bg-gradient-to-br from-[#c4b998] to-[#a89870] rounded-lg flex items-center justify-center text-[#111113] shadow-lg">
-                <GraduationCap size={18} />
-             </div>
+             <button onClick={() => { document.exitFullscreen?.().catch(() => {}); onExit(); }} className="px-5 py-2.5 border border-[#c4b998]/30 hover:bg-[#c4b998]/10 text-[#c4b998] rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-2">
+               Exit
+             </button>
            )}
         </div>
       </header>
@@ -878,12 +878,12 @@ const StudySession: React.FC<StudySessionProps> = ({ subtopic, agent, onComplete
                        </div>
                        <div>
                          <h3 className="text-4xl font-bold text-[#e8e4dc] tracking-tight">Mandatory Assessment</h3>
-                         <p className="text-white/30 font-medium mt-2">10-question quiz to verify your understanding.</p>
+                         <p className="text-white/30 font-medium mt-2">{Math.min(10, bundle.quiz.length)}-question quiz to verify your understanding.</p>
                        </div>
                        
                        <div className="figma-glass p-10 space-y-6">
                          <div className="flex flex-col items-center">
-                           <span className="text-6xl font-bold text-[#c4b998] w-24 text-center">10</span>
+                           <span className="text-6xl font-bold text-[#c4b998] w-24 text-center">{Math.min(10, bundle.quiz.length)}</span>
                            <span className="text-xs font-semibold uppercase text-white/30 tracking-widest mt-2">Questions</span>
                            <p className="text-xs text-white/20 mt-4">Available from Pool: {bundle.quiz.length}</p>
                          </div>

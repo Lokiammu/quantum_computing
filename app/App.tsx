@@ -620,7 +620,7 @@ const App: React.FC = () => {
       <div className="min-h-screen figma-bg flex flex-col text-white relative overflow-x-hidden">
         <AbstractBackground />
         <div className="flex-1 overflow-y-auto">
-          <About />
+          <About onEnter={() => setShowLanding(false)} />
           <div className="text-center pb-16">
             <button
               onClick={() => setShowLanding(false)}
